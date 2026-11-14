@@ -1,0 +1,531 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-14T00:00:00Z",
+  "title": "Design System: ZeroBell",
+  "extensions": {
+    "colorMeta": {
+      "ground": {
+        "role": "neutral",
+        "displayName": "Auditorium Ground",
+        "canonical": "oklch(19.5% 0.024 292)",
+        "tonalRamp": [
+          "oklch(15% 0.010 292)",
+          "oklch(26% 0.013 292)",
+          "oklch(38% 0.017 292)",
+          "oklch(49% 0.021 292)",
+          "oklch(61% 0.024 292)",
+          "oklch(72% 0.020 292)",
+          "oklch(84% 0.016 292)",
+          "oklch(95% 0.013 292)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Stage Surface",
+        "canonical": "oklch(23.0% 0.033 292)",
+        "tonalRamp": [
+          "oklch(15% 0.013 292)",
+          "oklch(26% 0.018 292)",
+          "oklch(38% 0.023 292)",
+          "oklch(49% 0.028 292)",
+          "oklch(61% 0.032 292)",
+          "oklch(72% 0.027 292)",
+          "oklch(84% 0.022 292)",
+          "oklch(95% 0.017 292)"
+        ]
+      },
+      "raised": {
+        "role": "neutral",
+        "displayName": "Raised Violet",
+        "canonical": "oklch(28.6% 0.047 290)",
+        "tonalRamp": [
+          "oklch(15% 0.019 290)",
+          "oklch(26% 0.026 290)",
+          "oklch(38% 0.033 290)",
+          "oklch(49% 0.040 290)",
+          "oklch(61% 0.047 290)",
+          "oklch(72% 0.039 290)",
+          "oklch(84% 0.032 290)",
+          "oklch(95% 0.025 290)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "oklch(34.2% 0.047 292)",
+        "tonalRamp": [
+          "oklch(15% 0.019 292)",
+          "oklch(26% 0.026 292)",
+          "oklch(38% 0.033 292)",
+          "oklch(49% 0.040 292)",
+          "oklch(61% 0.047 292)",
+          "oklch(72% 0.039 292)",
+          "oklch(84% 0.032 292)",
+          "oklch(95% 0.025 292)"
+        ]
+      },
+      "bezel": {
+        "role": "neutral",
+        "displayName": "Bezel",
+        "canonical": "oklch(34.6% 0.047 292)",
+        "tonalRamp": [
+          "oklch(15% 0.019 292)",
+          "oklch(26% 0.026 292)",
+          "oklch(38% 0.033 292)",
+          "oklch(49% 0.040 292)",
+          "oklch(61% 0.046 292)",
+          "oklch(72% 0.039 292)",
+          "oklch(84% 0.032 292)",
+          "oklch(95% 0.025 292)"
+        ]
+      },
+      "seat": {
+        "role": "neutral",
+        "displayName": "Empty Seat",
+        "canonical": "oklch(40.5% 0.050 293)",
+        "tonalRamp": [
+          "oklch(15% 0.020 293)",
+          "oklch(26% 0.028 293)",
+          "oklch(38% 0.035 293)",
+          "oklch(49% 0.043 293)",
+          "oklch(61% 0.050 293)",
+          "oklch(72% 0.042 293)",
+          "oklch(84% 0.034 293)",
+          "oklch(95% 0.027 293)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "House Lights",
+        "canonical": "oklch(95.9% 0.010 299)",
+        "tonalRamp": [
+          "oklch(15% 0.004 299)",
+          "oklch(26% 0.005 299)",
+          "oklch(38% 0.007 299)",
+          "oklch(49% 0.008 299)",
+          "oklch(61% 0.009 299)",
+          "oklch(72% 0.008 299)",
+          "oklch(84% 0.007 299)",
+          "oklch(95% 0.005 299)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "canonical": "oklch(76.3% 0.034 295)",
+        "tonalRamp": [
+          "oklch(15% 0.014 295)",
+          "oklch(26% 0.019 295)",
+          "oklch(38% 0.024 295)",
+          "oklch(49% 0.029 295)",
+          "oklch(61% 0.034 295)",
+          "oklch(72% 0.029 295)",
+          "oklch(84% 0.024 295)",
+          "oklch(95% 0.018 295)"
+        ]
+      },
+      "dim": {
+        "role": "neutral",
+        "displayName": "Dim",
+        "canonical": "oklch(64.6% 0.046 294)",
+        "tonalRamp": [
+          "oklch(15% 0.018 294)",
+          "oklch(26% 0.026 294)",
+          "oklch(38% 0.033 294)",
+          "oklch(49% 0.040 294)",
+          "oklch(61% 0.046 294)",
+          "oklch(72% 0.039 294)",
+          "oklch(84% 0.032 294)",
+          "oklch(95% 0.025 294)"
+        ]
+      },
+      "wait": {
+        "role": "primary",
+        "displayName": "Seat Amber",
+        "canonical": "oklch(81.2% 0.170 76)",
+        "tonalRamp": [
+          "oklch(15% 0.068 76)",
+          "oklch(26% 0.094 76)",
+          "oklch(38% 0.120 76)",
+          "oklch(49% 0.146 76)",
+          "oklch(61% 0.169 76)",
+          "oklch(72% 0.143 76)",
+          "oklch(84% 0.117 76)",
+          "oklch(95% 0.091 76)"
+        ]
+      },
+      "wait-hover": {
+        "role": "primary",
+        "displayName": "Seat Amber Hover",
+        "canonical": "oklch(84.7% 0.161 83)",
+        "tonalRamp": [
+          "oklch(15% 0.064 83)",
+          "oklch(26% 0.089 83)",
+          "oklch(38% 0.113 83)",
+          "oklch(49% 0.138 83)",
+          "oklch(61% 0.159 83)",
+          "oklch(72% 0.135 83)",
+          "oklch(84% 0.110 83)",
+          "oklch(95% 0.086 83)"
+        ]
+      },
+      "wait-tint": {
+        "role": "tint",
+        "displayName": "Amber Tint",
+        "canonical": "oklch(29.3% 0.017 30)",
+        "tonalRamp": [
+          "oklch(15% 0.007 30)",
+          "oklch(26% 0.009 30)",
+          "oklch(38% 0.012 30)",
+          "oklch(49% 0.014 30)",
+          "oklch(61% 0.017 30)",
+          "oklch(72% 0.014 30)",
+          "oklch(84% 0.012 30)",
+          "oklch(95% 0.009 30)"
+        ]
+      },
+      "urgent": {
+        "role": "secondary",
+        "displayName": "Overdue Red",
+        "canonical": "oklch(68.7% 0.202 27)",
+        "tonalRamp": [
+          "oklch(15% 0.081 27)",
+          "oklch(26% 0.112 27)",
+          "oklch(38% 0.143 27)",
+          "oklch(49% 0.174 27)",
+          "oklch(61% 0.201 27)",
+          "oklch(72% 0.170 27)",
+          "oklch(84% 0.139 27)",
+          "oklch(95% 0.108 27)"
+        ]
+      },
+      "urgent-tint": {
+        "role": "tint",
+        "displayName": "Red Tint",
+        "canonical": "oklch(29.9% 0.045 352)",
+        "tonalRamp": [
+          "oklch(15% 0.018 352)",
+          "oklch(26% 0.025 352)",
+          "oklch(38% 0.032 352)",
+          "oklch(49% 0.038 352)",
+          "oklch(61% 0.044 352)",
+          "oklch(72% 0.038 352)",
+          "oklch(84% 0.031 352)",
+          "oklch(95% 0.024 352)"
+        ]
+      },
+      "greeted": {
+        "role": "secondary",
+        "displayName": "Greeted Green",
+        "canonical": "oklch(77.5% 0.148 165)",
+        "tonalRamp": [
+          "oklch(15% 0.059 165)",
+          "oklch(26% 0.081 165)",
+          "oklch(38% 0.104 165)",
+          "oklch(49% 0.126 165)",
+          "oklch(61% 0.146 165)",
+          "oklch(72% 0.124 165)",
+          "oklch(84% 0.101 165)",
+          "oklch(95% 0.079 165)"
+        ]
+      },
+      "greeted-tint": {
+        "role": "tint",
+        "displayName": "Green Tint",
+        "canonical": "oklch(29.9% 0.027 233)",
+        "tonalRamp": [
+          "oklch(15% 0.011 233)",
+          "oklch(26% 0.015 233)",
+          "oklch(38% 0.019 233)",
+          "oklch(49% 0.023 233)",
+          "oklch(61% 0.027 233)",
+          "oklch(72% 0.022 233)",
+          "oklch(84% 0.018 233)",
+          "oklch(95% 0.014 233)"
+        ]
+      },
+      "clean": {
+        "role": "tertiary",
+        "displayName": "Cleaning Blue",
+        "canonical": "oklch(72.7% 0.143 257)",
+        "tonalRamp": [
+          "oklch(15% 0.057 257)",
+          "oklch(26% 0.079 257)",
+          "oklch(38% 0.101 257)",
+          "oklch(49% 0.122 257)",
+          "oklch(61% 0.141 257)",
+          "oklch(72% 0.120 257)",
+          "oklch(84% 0.098 257)",
+          "oklch(95% 0.076 257)"
+        ]
+      },
+      "clean-tint": {
+        "role": "tint",
+        "displayName": "Blue Tint",
+        "canonical": "oklch(29.7% 0.046 275)",
+        "tonalRamp": [
+          "oklch(15% 0.018 275)",
+          "oklch(26% 0.025 275)",
+          "oklch(38% 0.032 275)",
+          "oklch(49% 0.039 275)",
+          "oklch(61% 0.046 275)",
+          "oklch(72% 0.039 275)",
+          "oklch(84% 0.032 275)",
+          "oklch(95% 0.025 275)"
+        ]
+      },
+      "face": {
+        "role": "neutral",
+        "displayName": "Watch Glass",
+        "canonical": "oklch(15.0% 0.017 290)",
+        "tonalRamp": [
+          "oklch(15% 0.007 290)",
+          "oklch(26% 0.009 290)",
+          "oklch(38% 0.012 290)",
+          "oklch(49% 0.015 290)",
+          "oklch(61% 0.017 290)",
+          "oklch(72% 0.014 290)",
+          "oklch(84% 0.012 290)",
+          "oklch(95% 0.009 290)"
+        ]
+      },
+      "face-busy": {
+        "role": "neutral",
+        "displayName": "Serving Face",
+        "canonical": "oklch(51.4% 0.108 163)",
+        "tonalRamp": [
+          "oklch(15% 0.043 163)",
+          "oklch(26% 0.060 163)",
+          "oklch(38% 0.076 163)",
+          "oklch(49% 0.092 163)",
+          "oklch(61% 0.107 163)",
+          "oklch(72% 0.090 163)",
+          "oklch(84% 0.074 163)",
+          "oklch(95% 0.057 163)"
+        ]
+      },
+      "face-clean": {
+        "role": "neutral",
+        "displayName": "Cleaning Face",
+        "canonical": "oklch(48.8% 0.217 264)",
+        "tonalRamp": [
+          "oklch(15% 0.087 264)",
+          "oklch(26% 0.120 264)",
+          "oklch(38% 0.153 264)",
+          "oklch(49% 0.186 264)",
+          "oklch(61% 0.215 264)",
+          "oklch(72% 0.182 264)",
+          "oklch(84% 0.149 264)",
+          "oklch(95% 0.116 264)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Wordmark",
+        "purpose": "ZeroBell in the top bar only."
+      },
+      "title": {
+        "displayName": "Panel title",
+        "purpose": "Panel headings such as the shift roster."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Tagline, zone headings, wrist captions, button labels."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "KPI labels, tile text, chips; the smallest page size (12px at 1280)."
+      },
+      "metric": {
+        "displayName": "Metric",
+        "purpose": "KPI values, tabular mono."
+      },
+      "timer-tile": {
+        "displayName": "Tile timer",
+        "purpose": "Countdown on a waiting or urgent table."
+      },
+      "timer-face": {
+        "displayName": "Face timer",
+        "purpose": "Countdown or greeting time on a wrist face; em of the face size clamp(14px, faceH*0.058, 22px)."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "line-draw-in",
+        "value": "450ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "The one authored moment: an alert line draws from the lit chair to the wrist once when its alert starts (stroke-dashoffset). Skipped under prefers-reduced-motion."
+      },
+      {
+        "name": "alert-flash",
+        "value": "1s ease-in-out infinite, #991b1b to #dc2626 (rest #b91c1c)",
+        "purpose": "New-guest wrist face flash; white text stays above 4.5:1 at both ends. Disabled under prefers-reduced-motion."
+      },
+      {
+        "name": "press",
+        "value": "scale(0.95) on :active",
+        "purpose": "Attending and Cleaned buttons on the wrist."
+      },
+      {
+        "name": "state-colour",
+        "value": "Tailwind transition-colors default (150ms)",
+        "purpose": "Tiles, buttons and faces change colour; roster bar segments animate width."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "container-max",
+        "value": "1800px"
+      }
+    ],
+    "focus": {
+      "value": "outline: 2px solid #f2f0f7; outline-offset: 3px",
+      "purpose": "One neutral ring for every control."
+    },
+    "rootFontSize": "clamp(16px, calc(8px + 0.625vw), 20px)"
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one amber action: Simulate Rush Hour.",
+      "html": "<button class=\"ds-btn-primary\">Simulate Rush Hour</button>",
+      "css": ".ds-btn-primary { font-family: var(--font-archivo), Archivo, Arial, sans-serif; min-height: 44px; padding: 0 20px; border: none; border-radius: 9999px; background: #ffb000; color: #15131f; font-size: 14px; font-weight: 700; cursor: pointer; transition: background-color 150ms; } .ds-btn-primary:hover { background: #ffc233; } .ds-btn-primary:focus-visible { outline: 2px solid #f2f0f7; outline-offset: 3px; } .ds-btn-primary:disabled { opacity: 0.4; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary header action: Reset demo.",
+      "html": "<button class=\"ds-btn-ghost\">Reset demo</button>",
+      "css": ".ds-btn-ghost { font-family: var(--font-archivo), Archivo, Arial, sans-serif; min-height: 44px; padding: 0 16px; border: 1px solid #39344f; border-radius: 9999px; background: transparent; color: #b3aec6; font-size: 14px; cursor: pointer; transition: background-color 150ms, color 150ms; } .ds-btn-ghost:hover { background: #2a2640; color: #f2f0f7; } .ds-btn-ghost:focus-visible { outline: 2px solid #f2f0f7; outline-offset: 3px; }"
+    },
+    {
+      "name": "KPI",
+      "kind": "custom",
+      "refersTo": "kpi",
+      "description": "Header metric: muted label over a mono value; Avg response turns green or red against the 15s promise.",
+      "html": "<dl class=\"ds-kpis\"><div><dt>Active tables</dt><dd>5/12</dd></div><div><dt>Avg response</dt><dd class=\"ds-good\">6.2s</dd></div><div><dt>Avg response</dt><dd class=\"ds-bad\">18.4s</dd></div></dl>",
+      "css": ".ds-kpis { display: flex; gap: 32px; margin: 0; padding: 16px; background: #1d1a2b; } .ds-kpis dt { font-family: var(--font-archivo), Archivo, Arial, sans-serif; font-size: 12px; color: #b3aec6; } .ds-kpis dd { font-family: var(--font-geist-mono), 'Geist Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; margin: 0; font-size: 20px; font-weight: 700; color: #f2f0f7; } .ds-kpis .ds-good { color: #38d39f; } .ds-kpis .ds-bad { color: #ff5a4f; }"
+    },
+    {
+      "name": "Table Seat",
+      "kind": "card",
+      "refersTo": "table-tile-free",
+      "description": "A table drawn as a tile with four pill chairs; chairs and border carry one hue per state (free, waiting, urgent, dining, cleaning).",
+      "html": "<div class=\"ds-floor\"><div class=\"ds-table ds-free\"><i class=\"ds-c ds-t\"></i><i class=\"ds-c ds-l\"></i><button class=\"ds-tile\"><span class=\"ds-row\"><b>T1</b><span class=\"ds-st\">Free</span></span></button><i class=\"ds-c ds-r\"></i><i class=\"ds-c ds-b\"></i></div><div class=\"ds-table ds-waiting\"><i class=\"ds-c ds-t\"></i><i class=\"ds-c ds-l\"></i><button class=\"ds-tile\"><span class=\"ds-row\"><b>T4</b><span class=\"ds-st\">00:11</span></span><span class=\"ds-sub\">4 alerted</span></button><i class=\"ds-c ds-r\"></i><i class=\"ds-c ds-b\"></i></div><div class=\"ds-table ds-urgent\"><i class=\"ds-c ds-t\"></i><i class=\"ds-c ds-l\"></i><button class=\"ds-tile\"><span class=\"ds-row\"><b>T9</b><span class=\"ds-st\">00:04</span></span><span class=\"ds-sub\">7 + runners</span></button><i class=\"ds-c ds-r\"></i><i class=\"ds-c ds-b\"></i></div><div class=\"ds-table ds-dining\"><i class=\"ds-c ds-t\"></i><i class=\"ds-c ds-l\"></i><button class=\"ds-tile\"><span class=\"ds-row\"><b>T2</b><span class=\"ds-st\">Waiter 5</span></span><span class=\"ds-sub\">Tap: guest left</span></button><i class=\"ds-c ds-r\"></i><i class=\"ds-c ds-b\"></i></div><div class=\"ds-table ds-cleaning\"><i class=\"ds-c ds-t\"></i><i class=\"ds-c ds-l\"></i><button class=\"ds-tile\"><span class=\"ds-row\"><b>T21</b><span class=\"ds-st\">To clean</span></span><span class=\"ds-sub\">3 alerted</span></button><i class=\"ds-c ds-r\"></i><i class=\"ds-c ds-b\"></i></div></div>",
+      "css": ".ds-floor { display: grid; grid-template-columns: repeat(5, 150px); gap: 6px; padding: 16px; background: #15131f; } .ds-table { display: grid; grid-template-columns: 8px 1fr 8px; grid-template-rows: 8px 56px 8px; gap: 2px; border-radius: 12px; background: #15131f; } .ds-c { border-radius: 9999px; background: #4a4462; } .ds-t { grid-area: 1/2; width: 40%; height: 8px; margin: 0 auto; } .ds-b { grid-area: 3/2; width: 40%; height: 8px; margin: 0 auto; } .ds-l { grid-area: 2/1; height: 40%; width: 8px; margin: auto 0; } .ds-r { grid-area: 2/3; height: 40%; width: 8px; margin: auto 0; } .ds-tile { font-family: var(--font-archivo), Archivo, Arial, sans-serif; grid-area: 2/2; display: flex; flex-direction: column; justify-content: center; padding: 4px 8px; border: 2px solid #39344f; border-radius: 8px; background: #1d1a2b; color: #b3aec6; font-size: 12px; text-align: left; cursor: pointer; transition: border-color 150ms; } .ds-tile:hover { border-color: #b3aec6; } .ds-tile:focus-visible { outline: 2px solid #f2f0f7; outline-offset: 3px; } .ds-row { display: flex; justify-content: space-between; align-items: baseline; } .ds-row b { font-size: 14px; color: #f2f0f7; } .ds-waiting .ds-tile { border-color: #ffb000; background: #342927; } .ds-waiting .ds-c { background: #ffb000; } .ds-waiting .ds-st { font-family: var(--font-geist-mono), 'Geist Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 700; color: #ffb000; } .ds-urgent .ds-tile { border-color: #ff5a4f; background: #3f2430; } .ds-urgent .ds-c { background: #ff5a4f; } .ds-urgent .ds-st { font-family: var(--font-geist-mono), 'Geist Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 700; color: #ff5a4f; } .ds-dining .ds-tile { border-color: #38d39f; background: #203039; } .ds-dining .ds-tile:hover { border-color: #f2f0f7; } .ds-dining .ds-c { background: #38d39f; } .ds-dining .ds-st { font-weight: 600; color: #38d39f; } .ds-cleaning .ds-tile { border-style: dashed; border-color: #6aa8ff; background: #262b44; } .ds-cleaning .ds-c { background: transparent; border: 1px solid #6aa8ff; } .ds-cleaning .ds-st { font-weight: 600; color: #6aa8ff; }"
+    },
+    {
+      "name": "Wrist Watch Face",
+      "kind": "custom",
+      "refersTo": "watch-face-ready",
+      "description": "The hero: a drawn watch whose face is Ready, Alert (flashing red with Attending), Busy (green, greeted time) or Clean (blue, Cleaned).",
+      "html": "<div class=\"ds-wrists\"><div class=\"ds-watch\"><div class=\"ds-strap\"></div><div class=\"ds-bezel\"><div class=\"ds-face\"><div class=\"ds-bar\"><span>W1 · Zone A</span><span>● On shift</span></div><div class=\"ds-body\"><p class=\"ds-big\">Ready</p><p class=\"ds-m\">Waiting for a table</p></div></div></div><div class=\"ds-strap ds-sb\"></div></div><div class=\"ds-watch\"><div class=\"ds-strap\"></div><div class=\"ds-bezel\"><div class=\"ds-face ds-alert\"><div class=\"ds-bar\"><span>W4 · Zone C</span><span>● Alert</span></div><div class=\"ds-body\"><p class=\"ds-tl\">Table 20: seated</p><p class=\"ds-sm\">Seat sensor alert</p><p class=\"ds-num\">00:13</p><p class=\"ds-cap\">Greet now</p><button class=\"ds-act ds-red\">Attending</button></div></div></div><div class=\"ds-strap ds-sb\"></div></div><div class=\"ds-watch\"><div class=\"ds-strap\"></div><div class=\"ds-bezel\"><div class=\"ds-face ds-busy\"><div class=\"ds-bar\"><span>W2 · Zone B</span><span>● Busy</span></div><div class=\"ds-body\"><svg viewBox=\"0 0 24 24\" width=\"36\" height=\"36\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12.5l4.5 4.5L19 7.5\"/></svg><p class=\"ds-num\">6s</p><p class=\"ds-cap\">Greeted</p><p class=\"ds-sm\">Serving Table 12 · free in 9s</p></div></div></div><div class=\"ds-strap ds-sb\"></div></div><div class=\"ds-watch\"><div class=\"ds-strap\"></div><div class=\"ds-bezel\"><div class=\"ds-face ds-clean\"><div class=\"ds-bar\"><span>W3 · Runner</span><span>● Clean</span></div><div class=\"ds-body\"><p class=\"ds-tl\">Table 21: clean</p><p class=\"ds-sm\">Backup for Zone C</p><button class=\"ds-act ds-blue\">Cleaned</button></div></div></div><div class=\"ds-strap ds-sb\"></div></div></div>",
+      "css": ".ds-wrists { display: flex; gap: 16px; padding: 16px; background: #15131f; } .ds-watch { display: flex; flex-direction: column; align-items: center; } .ds-strap { width: 38%; height: 12px; border-radius: 12px 12px 0 0; background: #2a2640; } .ds-sb { border-radius: 0 0 12px 12px; } .ds-bezel { padding: 6px; border: 4px solid #3a3550; border-radius: 2.4rem; background: #15131f; } .ds-face { font-family: var(--font-archivo), Archivo, Arial, sans-serif; box-sizing: border-box; width: 180px; height: 220px; display: flex; flex-direction: column; gap: 5px; padding: 13px; border-radius: 2rem; background: #0b0a12; color: #fff; font-size: 14px; text-align: center; transition: background-color 150ms; } .ds-bar { display: flex; justify-content: space-between; font-size: 0.8em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.025em; white-space: nowrap; } .ds-face:not(.ds-alert):not(.ds-busy):not(.ds-clean) .ds-bar span:last-child { color: #b3aec6; } .ds-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; } .ds-body p { margin: 0; } .ds-big { font-size: 1.3em; font-weight: 700; color: #f2f0f7; } .ds-m { font-size: 0.85em; color: #b3aec6; } .ds-tl { font-size: 1.1em; font-weight: 700; } .ds-sm { font-size: 0.86em; } .ds-num { font-family: var(--font-geist-mono), 'Geist Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; font-size: 2.6em; font-weight: 700; line-height: 1; } .ds-cap { font-size: 0.8em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; } .ds-alert { background: #b91c1c; animation: ds-flash 1s ease-in-out infinite; } @keyframes ds-flash { 0%,100% { background-color: #991b1b; } 50% { background-color: #dc2626; } } @media (prefers-reduced-motion: reduce) { .ds-alert { animation: none; } } .ds-busy { background: #0d7a55; } .ds-clean { background: #1d4ed8; } .ds-act { font-family: var(--font-archivo), Archivo, Arial, sans-serif; width: 100%; min-height: 44px; margin-top: 3px; border: none; border-radius: 9999px; background: #fff; font-size: 1em; font-weight: 800; cursor: pointer; } .ds-act:active { transform: scale(0.95); } .ds-act:focus-visible { outline: 2px solid #f2f0f7; outline-offset: 3px; } .ds-red { color: #b91c1c; } .ds-blue { color: #1d4ed8; }"
+    },
+    {
+      "name": "Roster Chips",
+      "kind": "chip",
+      "refersTo": "roster-chip-free",
+      "description": "Mono staff chips: free, serving, alerted (red ring plus alert icon) and on break (dashed, with the word).",
+      "html": "<div class=\"ds-chips\"><span class=\"ds-chip\"><svg viewBox=\"0 0 10 14\" width=\"10\" height=\"12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.4\"><path d=\"M3 1h4M3 13h4\" stroke-linecap=\"round\"/><rect x=\"1.5\" y=\"3\" width=\"7\" height=\"8\" rx=\"2\"/></svg>W1</span><span class=\"ds-chip ds-serving\">W5</span><span class=\"ds-chip ds-alerted\">W8<svg viewBox=\"0 0 12 12\" width=\"12\" height=\"12\" fill=\"none\" stroke=\"#ff5a4f\" stroke-width=\"1.5\" stroke-linecap=\"round\"><circle cx=\"6\" cy=\"6\" r=\"5\"/><path d=\"M6 3.2v3.3M6 8.6v.1\"/></svg></span><span class=\"ds-chip ds-break\">W12 <span class=\"ds-w\">break</span></span></div>",
+      "css": ".ds-chips { display: flex; gap: 4px; padding: 12px; background: #1d1a2b; } .ds-chip { font-family: var(--font-geist-mono), 'Geist Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 6px; background: #2a2640; color: #f2f0f7; box-shadow: inset 0 0 0 1px #39344f; font-size: 12px; font-weight: 600; } .ds-serving { background: #203039; color: #38d39f; box-shadow: inset 0 0 0 1px #38d39f; } .ds-alerted { background: #3f2430; box-shadow: inset 0 0 0 2px #ff5a4f; } .ds-break { background: transparent; box-shadow: none; border: 1px dashed #39344f; color: #8f89a8; } .ds-w { font-family: var(--font-archivo), Archivo, Arial, sans-serif; font-weight: 400; }"
+    },
+    {
+      "name": "Alert Line",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "3px round-capped line from a lit chair through the gutter and channel to the wrist; dashed 7/7 for a runner; draws in once over 450ms.",
+      "html": "<svg class=\"ds-lines\" viewBox=\"0 0 320 140\" width=\"320\" height=\"140\"><path class=\"ds-line\" style=\"stroke:#ffb000\" d=\"M 40 120 H 30 V 70 C 30 70, 260 70, 260 14\"/><path class=\"ds-line\" style=\"stroke:#6aa8ff;stroke-dasharray:7 7\" d=\"M 120 120 H 110 V 75 C 110 75, 180 75, 180 14\"/></svg>",
+      "css": ".ds-lines { background: #15131f; } .ds-line { fill: none; stroke-width: 3; stroke-opacity: 0.9; stroke-linecap: round; stroke-linejoin: round; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Lit Seat Map",
+    "overview": "The room is a dark auditorium. Nothing on the ground glows until a guest sits. When one does, the chairs around their table light up amber and a line runs from that chair through the gutter to the wrist of the waiter who has to answer. The floor is the cause and the wrists are the effect, and both always fit on the same 16:9 screen. This is a stage for a presenter on a projector, so everything is sized for the back of the room. State is carried by light on a quiet violet-grey ground, never by decoration.\n\nThe system is dense but calm. At rest the whole screen is ground, surface and muted ink. Colour appears only when a table or a wrist changes state, and each state owns exactly one hue. The four wrist faces in the upper row are the heroes. The seat map below is a 3 by 3 tile grid per zone, where each table is drawn as a tile with four chairs. The roster is the fifth column beside the wrists.\n\nIt turns down the category default, a status-coloured card grid beside a staff list, and it turns down glows and cinema props. Depth comes from tonal steps and the drawn alert line, not from shadows.",
+    "keyCharacteristics": [
+      "Always dark, one theme, built for a projector.",
+      "One hue per state: amber waiting, red in the last 5 seconds or overdue, green greeted, blue cleaning, neutral free.",
+      "Tables are tiles with four chairs; the chairs carry the state light.",
+      "One authored motion: an alert line draws itself from a lit chair to the wrist once.",
+      "Archivo for words, Geist Mono for every number that counts.",
+      "A single neutral white focus ring that never reads as a state."
+    ],
+    "rules": [
+      {
+        "name": "The One Hue Per State Rule",
+        "body": "Amber means waiting, red means under 5 seconds or overdue, green means greeted, blue means cleaning, and neutral means free. No hue is reused for brand, decoration or a second meaning.",
+        "section": "colors"
+      },
+      {
+        "name": "The Dark Room Rule",
+        "body": "At rest the screen is ground, surface and muted ink. If something is coloured, a guest caused it.",
+        "section": "colors"
+      },
+      {
+        "name": "The Neutral Focus Rule",
+        "body": "Every control shares one focus ring: 2px solid `ink`, offset 3px. It is white so it never looks like a table state.",
+        "section": "colors"
+      },
+      {
+        "name": "The Numbers Are Mono Rule",
+        "body": "Any number that changes with time or counts results (countdowns, KPIs, response seconds, staff codes) is set in Geist Mono with tabular figures.",
+        "section": "typography"
+      },
+      {
+        "name": "The 11px Floor Rule",
+        "body": "No visible text renders smaller than 11px at any supported width. Label at 0.75rem is the floor for page text, and face type never drops below 14px × 0.8.",
+        "section": "typography"
+      },
+      {
+        "name": "The Same Screen Rule",
+        "body": "Cause (a lit table) and effect (the buzzing wrist) must be visible at once on the projector. Nothing that matters may sit below the fold at 1280×720.",
+        "section": "layout"
+      },
+      {
+        "name": "The Gutter Route Rule",
+        "body": "An alert line leaves the table's left chair, climbs the gutter beside its table, crosses in the channel in its wrist's lane, and rises to just below the strap. It never crosses another table.",
+        "section": "layout"
+      },
+      {
+        "name": "The No Glow Rule",
+        "body": "Nothing glows. Emphasis comes from a state hue on a dark ground, a thicker ring, or the drawn line, never from shadows or blur.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** give each table state exactly one hue: `wait` waiting, `urgent` under 5 seconds or overdue, `greeted` greeted, `clean` cleaning, neutral free.",
+      "**Do** keep state tints opaque so alert lines can pass behind tables.",
+      "**Do** keep the whole journey on one 16:9 screen with no scroll at 1280×720 and up, and stack below 1024px.",
+      "**Do** set every countdown, KPI and staff code in Geist Mono with tabular figures.",
+      "**Do** pair colour with a word, border style or icon (Overdue, dashed cleaning border, hollow chairs, \"break\", the alert icon).",
+      "**Do** keep text at 11px or larger and touch targets at 44px or taller.",
+      "**Do** announce events once through the hidden live regions (polite for actions, assertive for overdue and runner escalation), and never make a ticking face a live region.",
+      "**Do** move focus to the table or wrist that now holds the next action after Guest Sat, Guest Left, Attending or Cleaned.",
+      "**Do** honour `prefers-reduced-motion`: no face flash and no line draw-in."
+    ],
+    "donts": [
+      "**Don't** add glows, drop shadows or cinema props; depth is tonal.",
+      "**Don't** reuse a state hue for brand, decoration or a different meaning.",
+      "**Don't** use a coloured focus ring; it is always the white `ink` ring.",
+      "**Don't** add a second animated moment; the line draw-in and the alert-face flash are the only motion besides colour transitions.",
+      "**Don't** route an alert line across another table, or draw lines below 1024px.",
+      "**Don't** mix light panels into the dark room. If the real projector forces a light version, flip the whole theme at once."
+    ]
+  }
+}

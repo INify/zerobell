@@ -1,39 +1,98 @@
 @import "tailwindcss";
 
-/* Always dark: this demo is shown on a projector. */
+/* Lit Seat Map: a dark auditorium where a seated guest lights up their chair.
+   Always dark; this demo is shown on a projector. */
 :root {
-  --background: #020617;
-  --foreground: #e2e8f0;
+  --background: #15131f;
+  --foreground: #f2f0f7;
   color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-archivo);
   --font-mono: var(--font-geist-mono);
+
+  /* Room */
+  --color-ground: #15131f;
+  --color-surface: #1d1a2b;
+  --color-raised: #2a2640;
+  --color-line: #39344f;
+  --color-bezel: #3a3550;
+  --color-seat: #4a4462;
+
+  /* Ink */
+  --color-ink: #f2f0f7;
+  --color-muted: #b3aec6;
+  --color-dim: #8f89a8;
+
+  /* States: one hue each. Tints are opaque so alert lines pass behind tables. */
+  --color-wait: #ffb000;
+  --color-wait-hover: #ffc233;
+  --color-wait-tint: #342927;
+  --color-urgent: #ff5a4f;
+  --color-urgent-tint: #3f2430;
+  --color-greeted: #38d39f;
+  --color-greeted-tint: #203039;
+  --color-clean: #6aa8ff;
+  --color-clean-tint: #262b44;
+
+  /* Wrist faces */
+  --color-face: #0b0a12;
+  --color-face-busy: #0d7a55;
+  --color-face-clean: #1d4ed8;
+}
+
+/* Scale type up on big screens so the back of the room can read it:
+   16px at 1280 wide and below, rising to 20px at 1920. */
+html {
+  font-size: clamp(16px, calc(8px + 0.625vw), 20px);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-archivo), Arial, Helvetica, sans-serif;
 }
 
-/* Red flashing watch face for a new-guest alert. */
+/* One focus ring for every control, in a neutral colour so it never reads as
+   a table state. */
+:focus-visible {
+  outline: 2px solid #f2f0f7;
+  outline-offset: 3px;
+}
+
+::selection {
+  background: #ffb000;
+  color: #15131f;
+}
+
+/* Red flashing wrist face for a new-guest alert. Both ends of the flash keep
+   white text above 4.5:1 (red-800 7.6:1, red-600 4.8:1). */
 @keyframes alert-flash {
   0%,
   100% {
-    background-color: #b91c1c;
+    background-color: #991b1b;
   }
   50% {
-    background-color: #ef4444;
+    background-color: #dc2626;
   }
 }
 
 .alert-flash {
-  background-color: #dc2626;
+  background-color: #b91c1c;
   animation: alert-flash 1s ease-in-out infinite;
+}
+
+/* The line from a lit table to the wrist it buzzes; it draws itself in
+   (scripted in AlertLines) once per alert. */
+.alert-line {
+  fill: none;
+  stroke-width: 3;
+  stroke-opacity: 0.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 @media (prefers-reduced-motion: reduce) {
