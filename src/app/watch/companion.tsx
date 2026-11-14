@@ -1,36 +1,36 @@
 "use client";
 
-// Phone companion: one staff member's watch, mirrored live from the laptop
-// demo over the local network. The laptop runs the simulation; this page
-// listens for its snapshots, works out this person's alerts with the same
-// rules, and sends Accept / Done / shift taps back.
+// Phone band: one waiter's band, mirrored live from the laptop demo over the
+// local network. The laptop runs the simulation; this page listens for its
+// snapshots, works out this waiter's light with the same rules, vibrates, and
+// sends Accept / break taps back.
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
+  BUZZ_EVERY_MS,
+  Band,
   STAFF,
-  Watch,
-  alertOrder,
+  bandCaption,
+  bandState,
   initials,
-  recipientsFor,
-  type ShiftMap,
+  type Stage,
   type Staff,
-  type StatsMap,
-  type Table,
-  type TaskMap,
-} from "../floor-demo";
+  type World,
+} from "../pass-demo";
 import { isLocalHost, postSync, type SyncAction } from "../sync";
 
-type Snapshot = {
-  tables: Table[];
-  tasks: TaskMap;
-  shifts: ShiftMap;
-  stats?: StatsMap;
-  sentAt: number;
+type Snapshot = { world: World; sentAt: number };
+
+// How often the band vibrates while a plate is waiting, and the pulse pattern
+// (vibrate ms, pause ms, ...). Keep `every` in step with BUZZ_EVERY_MS.
+const VIBRATION: Record<Stage, { every: number; pattern: number[] }> = {
+  green: { every: BUZZ_EVERY_MS.green, pattern: [250, 120, 250] },
+  amber: { every: BUZZ_EVERY_MS.amber, pattern: [350, 120, 350] },
+  red: { every: BUZZ_EVERY_MS.red, pattern: [400, 100, 400, 100, 400] },
+  late: { every: BUZZ_EVERY_MS.late, pattern: [400, 100, 400, 100, 400] },
 };
 type Status = "connecting" | "live" | "offline" | "hosted";
-
-const SHIFT_LABEL = { in: "On shift", break: "On break", out: "Clocked out" } as const;
 
 // One shared stream for the page: the latest snapshot and connection state.
 function useLaptop() {
@@ -49,6 +49,7 @@ function useLaptop() {
     source.onerror = () => setStatus("offline"); // the browser keeps retrying
     source.addEventListener("snapshot", (e) => {
       const s = JSON.parse((e as MessageEvent<string>).data) as Snapshot;
+      if (!s.world) return; // an older demo's snapshot
       offset.current = s.sentAt - Date.now();
       setSnap(s);
       setStatus("live");
@@ -62,25 +63,25 @@ function useLaptop() {
 export default function Companion({ staffId }: { staffId: number | null }) {
   const laptop = useLaptop();
   const staff = STAFF.find((s) => s.id === staffId) ?? null;
-  return staff ? <Band staff={staff} {...laptop} /> : <Picker snap={laptop.snap} />;
+  return staff ? <PhoneBand staff={staff} {...laptop} /> : <Picker snap={laptop.snap} />;
 }
 
-// ---- pick who this phone is ---------------------------------------------------
+// ---- pick who this phone is -------------------------------------------------
 
 function Picker({ snap }: { snap: Snapshot | null }) {
   return (
     <main className="flex min-h-dvh flex-col gap-6 bg-ground px-4 py-6 text-ink">
       <header>
-        <p className="text-sm font-semibold text-muted">ZeroBell watch</p>
-        <h1 className="text-2xl font-bold tracking-tight">Who is wearing this watch?</h1>
+        <p className="text-sm font-semibold text-muted">ZeroBell Pass band</p>
+        <h1 className="text-2xl font-bold tracking-tight">Who is wearing this band?</h1>
         <p className="mt-1 text-base text-muted">
-          Tap a table on the laptop and every clocked-in watch buzzes. The first to Accept
-          takes it.
+          When a plate waits at the pass, one free waiter&apos;s band lights up and buzzes. Press
+          Accept to take it.
         </p>
       </header>
       <div className="grid grid-cols-2 gap-2">
         {STAFF.map((s) => {
-          const shift = snap?.shifts[s.id];
+          const onBreak = snap?.world.shifts[s.id] === "break";
           return (
             <Link
               key={s.id}
@@ -92,12 +93,8 @@ function Picker({ snap }: { snap: Snapshot | null }) {
               </span>
               <span className="min-w-0">
                 <span className="block truncate text-base font-bold">{s.name}</span>
-                {shift && <span className="block text-sm text-muted">{SHIFT_LABEL[shift]}</span>}
-                {snap?.stats?.[s.id] && snap.stats[s.id].accepted > 0 && (
-                  <span className="block font-mono text-sm text-muted tabular-nums">
-                    {snap.stats[s.id].accepted} accepted ·{" "}
-                    {(snap.stats[s.id].totalMs / snap.stats[s.id].accepted / 1000).toFixed(1)}s avg
-                  </span>
+                {snap && (
+                  <span className="block text-sm text-muted">{onBreak ? "On break" : "On shift"}</span>
                 )}
               </span>
             </Link>
@@ -108,9 +105,9 @@ function Picker({ snap }: { snap: Snapshot | null }) {
   );
 }
 
-// ---- the watch --------------------------------------------------------------------
+// ---- the band -----------------------------------------------------------------
 
-function Band({
+function PhoneBand({
   staff,
   snap,
   status,
@@ -127,26 +124,24 @@ function Band({
     return () => clearInterval(id);
   }, [offset]);
 
-  const tasks = snap?.tasks ?? {};
-  const shifts = snap?.shifts ?? {};
-  const shift = shifts[staff.id] ?? "out";
-  const task = tasks[staff.id] ?? null;
-  const alerts = snap
-    ? snap.tables
-        .filter((t) => recipientsFor(t, tasks, shifts).includes(staff.id))
-        .sort(alertOrder)
-    : [];
+  const state = snap ? bandState(snap.world, staff.id, now) : ({ kind: "idle" } as const);
 
-  // Buzz when a new alert reaches this watch (Android; iPhone browsers do not
-  // allow vibration).
-  const alertKey = alerts.map((t) => `${t.id}:${t.status}`).join(",");
-  const previous = useRef("");
+  // Vibrate as soon as a plate starts buzzing this band, then again every few
+  // seconds until the waiter presses Accept. The longer the plate waits, the
+  // closer together and stronger the pulses. Stops on Accept, pickup or break.
+  // (Android; iPhone browsers block vibration.)
+  const stage = state.kind === "alert" ? state.stage : null;
+  const slotId = state.kind === "alert" ? state.slotId : null;
   useEffect(() => {
-    const before = new Set(previous.current.split(",").filter(Boolean));
-    const fresh = alertKey.split(",").filter((k) => k && !before.has(k));
-    if (fresh.length > 0) navigator.vibrate?.([180, 80, 180]);
-    previous.current = alertKey;
-  }, [alertKey]);
+    if (stage === null) return;
+    const { every, pattern } = VIBRATION[stage];
+    navigator.vibrate?.(pattern);
+    const id = setInterval(() => navigator.vibrate?.(pattern), every);
+    return () => {
+      clearInterval(id);
+      navigator.vibrate?.(0);
+    };
+  }, [stage, slotId]);
 
   const send = (action: SyncAction) => postSync({ type: "action", action });
 
@@ -156,10 +151,7 @@ function Band({
       ? { dot: "bg-greeted", text: "Live from the laptop" }
       : { dot: "bg-wait", text: "Connected. Open the demo on the laptop." },
     offline: { dot: "bg-urgent", text: "Can't reach the laptop. Same Wi-Fi?" },
-    hosted: {
-      dot: "bg-dim",
-      text: "Phone mode works when the demo runs on a laptop on this Wi-Fi.",
-    },
+    hosted: { dot: "bg-dim", text: "Phone mode works when the demo runs on a laptop on this Wi-Fi." },
   };
   const line = statusLine[status];
 
@@ -178,21 +170,25 @@ function Band({
         </Link>
       </header>
 
-      <div className="flex flex-1 items-center justify-center py-4">
-        <div className="w-full max-w-[24rem] [--face-h:min(66dvh,34rem)]">
-          <Watch
-            staff={staff}
-            shift={shift}
-            task={task}
-            stats={snap?.stats?.[staff.id] ?? null}
-            alerts={alerts}
-            now={now}
-            notice={null}
-            onAccept={(tableId) => send({ kind: "accept", staffId: staff.id, tableId })}
-            onDone={() => send({ kind: "done", staffId: staff.id })}
-            onShift={(next) => send({ kind: "shift", staffId: staff.id, shift: next })}
-          />
-        </div>
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 py-4">
+        <Band
+          name={staff.name}
+          state={state}
+          size="lg"
+          onAccept={() => send({ kind: "accept", staffId: staff.id })}
+        />
+        <p className="text-lg font-bold">{staff.name}</p>
+        <p className="text-muted">{bandCaption(state)}</p>
+        {state.kind !== "going" && (
+          <button
+            onClick={() =>
+              send({ kind: "shift", staffId: staff.id, shift: state.kind === "break" ? "in" : "break" })
+            }
+            className="min-h-11 rounded-full border border-line px-5 text-sm text-muted transition-colors hover:bg-raised hover:text-ink"
+          >
+            {state.kind === "break" ? "End break" : "Take break"}
+          </button>
+        )}
       </div>
     </main>
   );

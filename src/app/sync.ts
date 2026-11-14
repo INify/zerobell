@@ -2,9 +2,8 @@
 // through /api/sync, and when sync is allowed to run at all.
 
 export type SyncAction =
-  | { kind: "accept"; staffId: number; tableId: number }
-  | { kind: "done"; staffId: number }
-  | { kind: "shift"; staffId: number; shift: "in" | "break" | "out" };
+  | { kind: "accept"; staffId: number }
+  | { kind: "shift"; staffId: number; shift: "in" | "break" };
 
 // Sync runs only when the page is served from this machine or the local
 // network (a phone on the same Wi-Fi). On the hosted site there is no shared

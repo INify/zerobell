@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ZeroBell · 15-second greeting demo",
+  title: "ZeroBell Pass · kitchen pass monitor",
   description:
-    "Seat sensors alert waiter smartbands so every guest is greeted within 15 seconds.",
+    "A camera at the kitchen pass alerts waiters on cheap screenless bands, so no dish waits.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

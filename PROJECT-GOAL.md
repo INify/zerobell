@@ -1,66 +1,73 @@
 # Project goal
 
 ## Goal
-Waiters greet and serve new customers within 15 seconds of them sitting down,
-without the customer ever having to wave or press a bell, even in a busy
-full-service restaurant with 25 tables and 15 staff.
+No dish waits at the pass (出餐口) for long. As soon as food is put out, one
+free waiter is alerted on a cheap, screenless wristband (colour light,
+vibration, one Accept button) and picks it up, so the food reaches the table
+hot, ideally within 60 seconds.
+
+The product only watches the pass and alerts waiters. It does not take orders,
+handle payments, or track which dish goes to which table, so it works alongside
+a POS such as FeedMe instead of competing with it.
 
 ## Evidence
 In one browser page, with no login:
 
-- Top bar: live metrics for Active Tables (for example 8/25), Available Staff
-  (for example 13/15), Avg Response Time, and Tables Turned Today. Also a
-  "Simulate Rush Hour" button.
-- Left: Tables 1–25 in 5-column grids, grouped into Zone A (Tables 1–9),
-  Zone B (10–17) and Zone C (18–25). Colours: green = Available,
-  amber/red = Needs Greeting with a ticking timer, teal = Dining,
-  blue = Needs Cleaning. Each table has one quick button: "Guest Sat" or
-  "Guest Left".
-- Right: a 15-staff shift roster grouped by zone, showing Available,
-  Busy Serving and On Break. Below it are 3 live smartwatch faces:
-  Waiter 1 (Zone A), Waiter 2 (Zone B) and Waiter 3 (Runner, all zones).
-- When "Guest Sat" is clicked on Table 4 (Zone A), every available Zone A staff
-  member is alerted. They light up in the roster, and Waiter 1's watch flashes
-  red with "Table 4: New Guest" and a 15-second countdown. Waiter 2 (Zone B)
-  is not alerted. If nobody claims it within 8 seconds, the runners are
-  alerted too, including Waiter 3's watch.
-- When Waiter 1 taps "Attending", the alert clears for everyone straight away.
-  Waiter 1 shows "Serving Table 4 (00:05)", becomes Busy Serving in the roster,
-  Available Staff drops by one, and Avg Response Time updates.
-- "Simulate Rush Hour" makes 4–5 random tables across different zones need
-  greeting at once, and each alert goes to its own zone's staff.
+- A pass with 4 slots. Each slot is Empty or shows a plate with a timer
+  counting up from 0s.
+- A row of waiter bands (reusing ZeroBell's 11 staff). Each band shows only a
+  colour light and status: free, on break, or going to the pass. No text
+  alerts, no table numbers.
+- Clicking "Place plate" on a slot (standing in for the camera) starts its
+  timer, and **one** free waiter's band lights green and buzzes (a vibration
+  animation, plus real vibration on the phone page where supported).
+- The waiter presses Accept on that band. The other bands stay quiet, and
+  that waiter shows as going to the pass.
+- Clicking "Picked up" on the slot stops the timer, empties the slot, frees the
+  waiter, and the top bar shows the time waited (for example 18s) and the
+  average wait.
+- If no one acts, the alert escalates on a fixed timeline:
+  - 15s with no Accept: the next free waiter is also alerted.
+  - 30s: the band turns amber and buzzes again; all free waiters are alerted.
+  - 45s: red, with repeated buzzing.
+  - 60s: marked **late** and counted as a miss.
+- "Simulate Rush Hour" places plates on several slots at once, and each one
+  is dispatched to a different free waiter.
 
 ## Required conditions
-- One waiter taps "Attending" before the table's countdown runs out.
-- Each alert reaches the available staff of that table's zone at once, and
-  runners after 8 seconds, or straight away if the zone has no one free.
-- Clicking "Guest Sat" changes a table from "Available" to "Needs Greeting".
-- Before that, the table is "Available" and 13 of the 15 staff are on shift.
-  This comes from local sample data.
+- Just before "picked up, other bands quiet": one waiter accepted on their
+  band, and the alert cleared from every other band.
+- Before that: the system picked one free waiter and their band lit up and
+  buzzed, escalating with how long the plate has waited (15s / 30s / 45s / 60s).
+- Before that: a plate appeared in a pass slot ("Place plate" button) and its
+  timer started.
+- Before that: the page shows 4 empty pass slots and the waiter bands, with
+  who is free, on break, or busy. This comes from local sample data and is
+  adapted from ZeroBell's existing tables, watches and accept/dispatch logic.
 
 ## Smallest journey
-1. The tester opens the page and sees 25 tables in 3 zones, the 15-staff roster,
-   and 3 idle watches.
-2. The tester clicks "Guest Sat" on Table 4. The Zone A staff light up and
-   Waiter 1's watch flashes red with a 15-second countdown. After 8 seconds,
-   Waiter 3 (Runner) is alerted too.
-3. The tester taps "Attending" on Waiter 1. The alert clears everywhere, Waiter 1
-   is Busy Serving, and the metrics update.
-4. The tester clicks "Guest Left" on Table 4, then "Cleaned" on a Zone A watch.
-   Table 4 is Available again and Tables Turned goes up by one.
-5. The tester clicks "Simulate Rush Hour" and sees 4–5 tables across zones
-   alerting at the same time, each on the right zone's watch.
+1. The tester opens the page and sees 4 empty pass slots and the waiter bands,
+   most free and a couple on break.
+2. The tester clicks "Place plate" on Slot 1. Its timer starts, and one free
+   waiter's band lights green and buzzes.
+3. The tester presses Accept on that band. The other bands stay quiet, and the
+   waiter shows as going to the pass.
+4. The tester clicks "Picked up" on Slot 1. The slot empties, the waiter is
+   free again, and the top bar shows the time waited and the average wait.
+5. The tester places a plate and does nothing. They see a second waiter
+   alerted at 15s, amber at 30s, red at 45s and "late" at 60s. Then they click
+   "Simulate Rush Hour" and see several plates dispatched to different waiters.
 
 ## Later
-- What happens when a countdown hits 0 (escalate to a manager). For now the
-  watch shows "Overdue!" and staff can still attend.
-- Letting staff go on or off break from the roster. For now 2 staff are on
-  break in the sample data.
-- Choosing the nearest free waiter instead of alerting the whole zone.
-- Real seat sensors and real smartbands, kept in sync across devices
-  (for example Supabase Realtime).
-- More manager stats, such as how many tables missed 15 seconds.
+- Real dish detection from a webcam or the restaurant's CCTV, running on a
+  small box in the restaurant so video is not sent to the cloud.
+- Real hardware bands (ESP32/nRF52 with an RGB LED, vibration motor and button,
+  about US$8–15 each) or off-the-shelf wrist pagers for a first pilot.
+- Adjustable timings per restaurant (for example longer for hotpot).
+- A "system offline" band pattern so the kitchen falls back to the bell.
+- A shift report: average and worst wait at the pass, and late plates per hour.
+- Optional FeedMe integration, for example showing the ticket at the pass.
+- Choosing the nearest free waiter instead of taking turns.
 
-_Updated on 13 November 2026: scaled from 6 tables and 2 waiters to 25 tables,
-15 staff and 3 zones, with a rush-hour simulation, at the participant's
-request._
+_Updated on 14 November 2026: pivoted from greeting new guests (ZeroBell) to
+monitoring food waiting at the kitchen pass, to avoid overlapping with FeedMe._

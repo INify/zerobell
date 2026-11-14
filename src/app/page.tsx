@@ -1,5 +1,5 @@
-import FloorDemo from "./floor-demo";
+import PassDemo from "./pass-demo";
 
 export default function Home() {
-  return <FloorDemo />;
+  return <PassDemo />;
 }

@@ -114,3 +114,68 @@ body {
     animation: none;
   }
 }
+
+/* Waiter bands: the light glows, and the band shakes while it buzzes. */
+.led-glow {
+  box-shadow: 0 0 0.6em 0.15em var(--glow), 0 0 1.6em 0.3em color-mix(in srgb, var(--glow) 45%, transparent);
+}
+
+@keyframes led-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.led-blink {
+  animation: led-blink 0.6s steps(2, jump-none) infinite;
+}
+
+@keyframes buzz {
+  0%,
+  20%,
+  100% {
+    transform: translateX(0);
+  }
+  2%,
+  8%,
+  14% {
+    transform: translateX(-3px) rotate(-2deg);
+  }
+  5%,
+  11%,
+  17% {
+    transform: translateX(3px) rotate(2deg);
+  }
+}
+
+/* The duration is set inline per stage: one shake, then a pause, repeating. */
+.buzz {
+  animation: buzz 3s ease-in-out infinite;
+}
+
+/* A late plate's tile border pulses. */
+@keyframes border-flash {
+  0%,
+  100% {
+    border-color: var(--color-alert-hi);
+  }
+  50% {
+    border-color: var(--color-alert-lo);
+  }
+}
+
+.alert-flash-border {
+  animation: border-flash 1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buzz,
+  .led-blink,
+  .alert-flash-border {
+    animation: none;
+  }
+}

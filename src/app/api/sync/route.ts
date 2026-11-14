@@ -1,8 +1,8 @@
 // Local sync between the laptop demo and the phone companion (/watch).
 //
-// The laptop page runs the simulation and POSTs a snapshot whenever tables or
+// The laptop page runs the simulation and POSTs a snapshot whenever the pass or
 // staff change. Phones open GET as a Server-Sent Events stream and receive
-// every snapshot; when a phone taps Attending or Cleaned it POSTs an action,
+// every snapshot; when a phone band taps Accept it POSTs an action,
 // which is streamed back to the laptop page to apply.
 //
 // State lives in this dev server's memory, so this is for a laptop and a
@@ -107,15 +107,14 @@ export async function GET(request: Request) {
   });
 }
 
-// Taps a phone can send: accept a table, finish the current task, or change
-// shift. Anything else is rejected.
+// Taps a phone band can send: Accept, or go on / come back from a break.
+// Anything else is rejected.
 function isAction(a: unknown) {
   if (!a || typeof a !== "object") return false;
   const x = a as Record<string, unknown>;
   if (!Number.isInteger(x.staffId)) return false;
-  if (x.kind === "accept") return Number.isInteger(x.tableId);
-  if (x.kind === "done") return true;
-  if (x.kind === "shift") return x.shift === "in" || x.shift === "break" || x.shift === "out";
+  if (x.kind === "accept") return true;
+  if (x.kind === "shift") return x.shift === "in" || x.shift === "break";
   return false;
 }
 
