@@ -327,7 +327,7 @@
       },
       "title": {
         "displayName": "Panel title",
-        "purpose": "Panel headings such as the shift roster."
+        "purpose": "Zone and runner headings."
       },
       "body": {
         "displayName": "Body",
@@ -370,7 +370,7 @@
       {
         "name": "state-colour",
         "value": "Tailwind transition-colors default (150ms)",
-        "purpose": "Tiles, buttons and faces change colour; roster bar segments animate width."
+        "purpose": "Tiles, buttons and faces change colour."
       }
     ],
     "breakpoints": [
@@ -439,14 +439,6 @@
       "css": ".ds-wrists { display: flex; gap: 16px; padding: 16px; background: #15131f; } .ds-watch { display: flex; flex-direction: column; align-items: center; } .ds-strap { width: 38%; height: 12px; border-radius: 12px 12px 0 0; background: #2a2640; } .ds-sb { border-radius: 0 0 12px 12px; } .ds-bezel { padding: 6px; border: 4px solid #3a3550; border-radius: 2.4rem; background: #15131f; } .ds-face { font-family: var(--font-archivo), Archivo, Arial, sans-serif; box-sizing: border-box; width: 180px; height: 220px; display: flex; flex-direction: column; gap: 5px; padding: 13px; border-radius: 2rem; background: #0b0a12; color: #fff; font-size: 14px; text-align: center; transition: background-color 150ms; } .ds-bar { display: flex; justify-content: space-between; font-size: 0.8em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.025em; white-space: nowrap; } .ds-face:not(.ds-alert):not(.ds-busy):not(.ds-clean) .ds-bar span:last-child { color: #b3aec6; } .ds-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; } .ds-body p { margin: 0; } .ds-big { font-size: 1.3em; font-weight: 700; color: #f2f0f7; } .ds-m { font-size: 0.85em; color: #b3aec6; } .ds-tl { font-size: 1.1em; font-weight: 700; } .ds-sm { font-size: 0.86em; } .ds-num { font-family: var(--font-geist-mono), 'Geist Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; font-size: 2.6em; font-weight: 700; line-height: 1; } .ds-cap { font-size: 0.8em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; } .ds-alert { background: #b91c1c; animation: ds-flash 1s ease-in-out infinite; } @keyframes ds-flash { 0%,100% { background-color: #991b1b; } 50% { background-color: #dc2626; } } @media (prefers-reduced-motion: reduce) { .ds-alert { animation: none; } } .ds-busy { background: #0d7a55; } .ds-clean { background: #1d4ed8; } .ds-act { font-family: var(--font-archivo), Archivo, Arial, sans-serif; width: 100%; min-height: 44px; margin-top: 3px; border: none; border-radius: 9999px; background: #fff; font-size: 1em; font-weight: 800; cursor: pointer; } .ds-act:active { transform: scale(0.95); } .ds-act:focus-visible { outline: 2px solid #f2f0f7; outline-offset: 3px; } .ds-red { color: #b91c1c; } .ds-blue { color: #1d4ed8; }"
     },
     {
-      "name": "Roster Chips",
-      "kind": "chip",
-      "refersTo": "roster-chip-free",
-      "description": "Mono staff chips: free, serving, alerted (red ring plus alert icon) and on break (dashed, with the word).",
-      "html": "<div class=\"ds-chips\"><span class=\"ds-chip\"><svg viewBox=\"0 0 10 14\" width=\"10\" height=\"12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.4\"><path d=\"M3 1h4M3 13h4\" stroke-linecap=\"round\"/><rect x=\"1.5\" y=\"3\" width=\"7\" height=\"8\" rx=\"2\"/></svg>W1</span><span class=\"ds-chip ds-serving\">W5</span><span class=\"ds-chip ds-alerted\">W8<svg viewBox=\"0 0 12 12\" width=\"12\" height=\"12\" fill=\"none\" stroke=\"#ff5a4f\" stroke-width=\"1.5\" stroke-linecap=\"round\"><circle cx=\"6\" cy=\"6\" r=\"5\"/><path d=\"M6 3.2v3.3M6 8.6v.1\"/></svg></span><span class=\"ds-chip ds-break\">W12 <span class=\"ds-w\">break</span></span></div>",
-      "css": ".ds-chips { display: flex; gap: 4px; padding: 12px; background: #1d1a2b; } .ds-chip { font-family: var(--font-geist-mono), 'Geist Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 6px; background: #2a2640; color: #f2f0f7; box-shadow: inset 0 0 0 1px #39344f; font-size: 12px; font-weight: 600; } .ds-serving { background: #203039; color: #38d39f; box-shadow: inset 0 0 0 1px #38d39f; } .ds-alerted { background: #3f2430; box-shadow: inset 0 0 0 2px #ff5a4f; } .ds-break { background: transparent; box-shadow: none; border: 1px dashed #39344f; color: #8f89a8; } .ds-w { font-family: var(--font-archivo), Archivo, Arial, sans-serif; font-weight: 400; }"
-    },
-    {
       "name": "Alert Line",
       "kind": "custom",
       "refersTo": null,
@@ -457,7 +449,7 @@
   ],
   "narrative": {
     "northStar": "The Lit Seat Map",
-    "overview": "The room is a dark auditorium. Nothing on the ground glows until a guest sits. When one does, the chairs around their table light up amber and a line runs from that chair through the gutter to the wrist of the waiter who has to answer. The floor is the cause and the wrists are the effect, and both always fit on the same 16:9 screen. This is a stage for a presenter on a projector, so everything is sized for the back of the room. State is carried by light on a quiet violet-grey ground, never by decoration.\n\nThe system is dense but calm. At rest the whole screen is ground, surface and muted ink. Colour appears only when a table or a wrist changes state, and each state owns exactly one hue. The four wrist faces in the upper row are the heroes. The seat map below is a 3 by 3 tile grid per zone, where each table is drawn as a tile with four chairs. The roster is the fifth column beside the wrists.\n\nIt turns down the category default, a status-coloured card grid beside a staff list, and it turns down glows and cinema props. Depth comes from tonal steps and the drawn alert line, not from shadows.",
+    "overview": "The room is a dark auditorium. Nothing on the ground glows until a guest sits. When one does, the chairs around their table light up amber and a line runs from that chair through the gutter to the wrist of the waiter who has to answer. The floor is the cause and the wrists are the effect, and both always fit on the same 16:9 screen. This is a stage for a presenter on a projector, so everything is sized for the back of the room. State is carried by light on a quiet violet-grey ground, never by decoration.\n\nThe system is dense but calm. At rest the whole screen is ground, surface and muted ink. Colour appears only when a table or a wrist changes state, and each state owns exactly one hue. Every waiter has an equal watch in one row across the top, and every free band buzzes when a guest sits. The seat map below is one open 6 by 2 grid, where each table is drawn as a tile with four chairs.\n\nIt turns down the category default, a status-coloured card grid beside a staff list, and it turns down glows and cinema props. Depth comes from tonal steps and the drawn alert line, not from shadows.",
     "keyCharacteristics": [
       "Always dark, one theme, built for a projector.",
       "One hue per state: amber waiting, red in the last 5 seconds or overdue, green greeted, blue cleaning, neutral free.",

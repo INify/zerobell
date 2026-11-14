@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { isLocalHost, postSync, type SyncAction } from "./sync";
 
 // ---------------------------------------------------------------------------
 // Demo rules
@@ -8,63 +9,80 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 
 const GREETING_LIMIT_S = 15; // the promise: every guest greeted within 15s
 const URGENT_AT_S = 5; // table card turns red in the last 5 seconds
-const ESCALATE_AFTER_S = 8; // runners are alerted if nobody claims it by then
-const BUSY_AFTER_ATTEND_S = 12; // staff are "Busy Serving" this long after attending
 const NOTICE_FOR_MS = 6000; // "Table 4 taken by Waiter 1" fades after this
 
-type ZoneId = "A" | "B" | "C";
-type Role = ZoneId | "Runner";
-type TableStatus = "available" | "needsGreeting" | "dining" | "needsCleaning";
+// "cleaning" means someone accepted the cleaning alert and is on it.
+type TableStatus = "available" | "needsGreeting" | "dining" | "needsCleaning" | "cleaning";
 
-type Table = {
+export type Table = {
   id: number;
-  zone: ZoneId;
   status: TableStatus;
   alertAt: number | null;
   servedBy: number | null;
   waitedMs: number | null;
 };
 
-type Staff = { id: number; role: Role; onBreak: boolean };
-type BusyInfo = { until: number; tableId: number; waitedMs: number };
-type BusyMap = Record<number, BusyInfo>;
+export type Staff = { id: number; name: string };
+
+// Each watch sets its own shift. Only clocked-in staff without a task get
+// table alerts; on a break or clocked out, the watch sleeps.
+export type Shift = "in" | "break" | "out";
+export type ShiftMap = Record<number, Shift>;
+
+// The one job a staff member has accepted, kept until they tap Done.
+export type Task = { kind: "serve" | "clean"; tableId: number };
+export type TaskMap = Record<number, Task>;
+
+// Logged silently on every Accept: how long the alert had been out (from the
+// moment it fired) when this staff member took it. Shown only on their own
+// profile, never during an alert.
+export type StaffStats = { accepted: number; totalMs: number };
+export type StatsMap = Record<number, StaffStats>;
+
 type Notices = Record<number, { text: string; at: number } | null>;
 
 // ---------------------------------------------------------------------------
 // Local sample data
 // ---------------------------------------------------------------------------
 
-const ZONES: { id: ZoneId; first: number; last: number }[] = [
-  { id: "A", first: 1, last: 4 },
-  { id: "B", first: 5, last: 8 },
-  { id: "C", first: 9, last: 12 },
-];
 const TOTAL_TABLES = 12;
 
-const STAFF: Staff[] = [
-  { id: 1, role: "A", onBreak: false },
-  { id: 2, role: "B", onBreak: false },
-  { id: 3, role: "C", onBreak: false },
-  { id: 4, role: "A", onBreak: false },
-  { id: 5, role: "B", onBreak: false },
-  { id: 6, role: "C", onBreak: false },
-  { id: 7, role: "A", onBreak: false },
-  { id: 8, role: "B", onBreak: false },
-  { id: 9, role: "C", onBreak: true },
-  { id: 10, role: "Runner", onBreak: false },
-  { id: 11, role: "Runner", onBreak: false },
-];
+// Eleven staff, no zones: any free waiter can take any table. Demo names.
+export const STAFF: Staff[] = [
+  "Aisyah",
+  "Wei Ming",
+  "Priya",
+  "Daniel",
+  "Mei Ling",
+  "Arjun",
+  "Nurul",
+  "Jason",
+  "Kavitha",
+  "Hafiz",
+  "Siew Lan",
+].map((name, i) => ({ id: i + 1, name }));
 
-// After someone taps Attending, their face stays big this long so the
-// handoff is visible even if the zone has other tables waiting.
-const JUST_GREETED_MS = 4000;
+export function staffName(id: number | null) {
+  return STAFF.find((s) => s.id === id)?.name ?? "Staff";
+}
 
-const ROSTER_GROUPS: { label: string; role: Role }[] = [
-  { label: "Zone A", role: "A" },
-  { label: "Zone B", role: "B" },
-  { label: "Zone C", role: "C" },
-  { label: "Runners", role: "Runner" },
-];
+export function initials(name: string) {
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+// Who is on shift when the demo opens: one on a break, one clocked out.
+function startingShifts(): ShiftMap {
+  const shifts: ShiftMap = {};
+  for (const s of STAFF) shifts[s.id] = "in";
+  shifts[9] = "break";
+  shifts[11] = "out";
+  return shifts;
+}
 
 // Tables already dining when the demo opens, and which waiter has them.
 const DINING_AT_START: Record<number, number> = {
@@ -73,18 +91,12 @@ const DINING_AT_START: Record<number, number> = {
   11: 6,
 };
 
-function zoneOf(tableId: number): ZoneId {
-  const zone = ZONES.find((z) => tableId >= z.first && tableId <= z.last);
-  return zone ? zone.id : "C";
-}
-
 function startingTables(): Table[] {
   return Array.from({ length: TOTAL_TABLES }, (_, i) => {
     const id = i + 1;
     const waiter = DINING_AT_START[id];
     return {
       id,
-      zone: zoneOf(id),
       status: waiter ? "dining" : "available",
       alertAt: null,
       servedBy: waiter ?? null,
@@ -111,20 +123,10 @@ function shuffled<T>(items: T[]): T[] {
   return copy;
 }
 
-// 3–4 random free tables, covering every zone that has a free table.
+// 3–4 random free tables at once.
 function pickRushTables(tables: Table[]): number[] {
   const free = shuffled(tables.filter((t) => t.status === "available"));
-  const picked: Table[] = [];
-  for (const z of ZONES) {
-    const t = free.find((x) => x.zone === z.id);
-    if (t) picked.push(t);
-  }
-  const target = 3 + Math.floor(Math.random() * 2);
-  for (const t of free) {
-    if (picked.length >= target) break;
-    if (!picked.includes(t)) picked.push(t);
-  }
-  return picked.map((t) => t.id);
+  return free.slice(0, 3 + Math.floor(Math.random() * 2)).map((t) => t.id);
 }
 
 function listTables(ids: number[]) {
@@ -144,44 +146,60 @@ function secondsLeft(alertAt: number | null, now: number) {
   return Math.min(GREETING_LIMIT_S, Math.max(0, left));
 }
 
-function isBusy(busy: BusyMap, staffId: number, now: number) {
-  const b = busy[staffId];
-  return !!b && b.until > now;
+// How far past the 15-second promise a waiting table is, in whole seconds.
+function secondsLate(alertAt: number | null, now: number) {
+  if (alertAt === null) return 0;
+  return Math.max(0, Math.floor((now - alertAt) / 1000) - GREETING_LIMIT_S);
 }
 
-function isAvailable(s: Staff, busy: BusyMap, now: number) {
-  return !s.onBreak && !isBusy(busy, s.id, now);
+// A greeting alert gets hotter as the promise runs out: calm amber when the
+// guest sits, a red flash in the last 5 seconds, solid deep red once late.
+type AlertPhase = "wait" | "urgent" | "late";
+
+function alertPhase(alertAt: number | null, now: number): AlertPhase {
+  const left = secondsLeft(alertAt, now);
+  return left === 0 ? "late" : left <= URGENT_AT_S ? "urgent" : "wait";
+}
+
+const PHASE_FACE: Record<AlertPhase, string> = {
+  wait: "bg-wait text-ground",
+  urgent: "alert-flash text-white",
+  late: "bg-alert-late text-white",
+};
+
+export function isFree(staffId: number, tasks: TaskMap, shifts: ShiftMap) {
+  return shifts[staffId] === "in" && !tasks[staffId];
+}
+
+function withoutTable(tasks: TaskMap, tableId: number): TaskMap {
+  const next: TaskMap = {};
+  for (const [id, task] of Object.entries(tasks)) {
+    if (task.tableId !== tableId) next[Number(id)] = task;
+  }
+  return next;
 }
 
 function isAlerting(t: Table) {
   return t.status === "needsGreeting" || t.status === "needsCleaning";
 }
 
-// Who gets this table's alert right now: the zone's free staff, plus free
-// runners once 8 seconds pass unclaimed (or straight away if the zone has
-// nobody free).
-function recipientsFor(t: Table, busy: BusyMap, now: number): number[] {
+// Who gets this table's alert right now: every clocked-in staff member
+// without a task. There are no zones; the first to tap Accept takes it, and
+// the alert clears from everyone else's watch.
+export function recipientsFor(t: Table, tasks: TaskMap, shifts: ShiftMap): number[] {
   if (!isAlerting(t) || t.alertAt === null) return [];
-  const zoneStaff = STAFF.filter(
-    (s) => s.role === t.zone && isAvailable(s, busy, now)
-  );
-  const escalated =
-    zoneStaff.length === 0 || now - t.alertAt >= ESCALATE_AFTER_S * 1000;
-  const runners = escalated
-    ? STAFF.filter((s) => s.role === "Runner" && isAvailable(s, busy, now))
-    : [];
-  return [...zoneStaff, ...runners].map((s) => s.id);
+  return STAFF.filter((s) => isFree(s.id, tasks, shifts)).map((s) => s.id);
 }
 
 // New guests before cleaning; oldest first.
-function alertOrder(a: Table, b: Table) {
+export function alertOrder(a: Table, b: Table) {
   if (a.status !== b.status) return a.status === "needsGreeting" ? -1 : 1;
   return (a.alertAt ?? 0) - (b.alertAt ?? 0);
 }
 
 // Move focus to an element that exists after the next render, so keyboard users
 // keep their place when the button they pressed disappears. The first id that
-// exists wins (a waiter's big face, else their mini watch).
+// exists wins.
 function focusAfterRender(...elementIds: string[]) {
   // A zero-delay timeout runs after React has committed the click's update,
   // and unlike requestAnimationFrame it isn't throttled in background panes.
@@ -193,51 +211,15 @@ function focusAfterRender(...elementIds: string[]) {
   });
 }
 
-// Which waiter in a group gets the big face: whoever just greeted (so the
-// handoff shows), then whoever is alerted to greet, then to clean, then busy,
-// then ready. Runners only get a big face once one of them is needed.
-function pickLead(
-  group: Staff[],
-  alertsOf: (id: number) => Table[],
-  busy: BusyMap,
-  now: number,
-  runners: boolean
-): Staff | null {
-  const ranked = group.map((s, order) => {
-    const alerts = alertsOf(s.id);
-    const b = isBusy(busy, s.id, now) ? busy[s.id] : null;
-    const greetedAt = b ? b.until - BUSY_AFTER_ATTEND_S * 1000 : 0;
-    const rank = s.onBreak
-      ? 5
-      : b && now - greetedAt < JUST_GREETED_MS
-      ? 0
-      : alerts.some((t) => t.status === "needsGreeting")
-      ? 1
-      : alerts.length > 0
-      ? 2
-      : b
-      ? 3
-      : 4;
-    // Among those who just greeted, the most recent one leads.
-    return { s, rank, tie: rank === 0 ? -greetedAt : order };
-  });
-  ranked.sort((a, b) => a.rank - b.rank || a.tie - b.tie);
-  const best = ranked[0];
-  if (!best || (runners && best.rank > 2)) return null;
-  return best.s;
-}
-
-function roleLabel(role: Role) {
-  return role === "Runner" ? "Runner · All zones" : `Zone ${role}`;
-}
-
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
 export default function FloorDemo() {
   const [tables, setTables] = useState<Table[]>(startingTables);
-  const [busy, setBusy] = useState<BusyMap>({});
+  const [tasks, setTasks] = useState<TaskMap>({});
+  const [shifts, setShifts] = useState<ShiftMap>(startingShifts);
+  const [stats, setStats] = useState<StatsMap>({});
   const [now, setNow] = useState(0);
   const [responseTimes, setResponseTimes] = useState<number[]>([]);
   const [tablesTurned, setTablesTurned] = useState(0);
@@ -249,17 +231,49 @@ export default function FloorDemo() {
     return () => clearInterval(id);
   }, []);
 
+  // ---- phone companion (/watch), on the local network only ----
+  // This page stays the simulation: it publishes tables, tasks and shifts to
+  // the phones, and applies the Accept / Done / shift taps they send back.
+  const [phones, setPhones] = useState<{ url: string; qr: string }[] | null>(null);
+  const [phoneOpen, setPhoneOpen] = useState(false);
+  const handlers = useRef<{
+    accept: (staffId: number, tableId: number) => void;
+    done: (staffId: number) => void;
+    setShift: (staffId: number, shift: Shift) => void;
+  } | null>(null);
+  useEffect(() => {
+    handlers.current = { accept, done, setShift };
+  });
+  useEffect(() => {
+    if (!isLocalHost(window.location.hostname)) return;
+    fetch("/api/sync?info=1")
+      .then((r) => r.json())
+      .then((d: { phones: { url: string; qr: string }[] }) => setPhones(d.phones))
+      .catch(() => {});
+    const source = new EventSource("/api/sync");
+    source.addEventListener("action", (e) => {
+      const a = JSON.parse((e as MessageEvent<string>).data) as SyncAction;
+      if (a.kind === "accept") handlers.current?.accept(a.staffId, a.tableId);
+      else if (a.kind === "done") handlers.current?.done(a.staffId);
+      else handlers.current?.setShift(a.staffId, a.shift);
+    });
+    return () => source.close();
+  }, []);
+  useEffect(() => {
+    if (!isLocalHost(window.location.hostname)) return;
+    postSync({ type: "snapshot", snapshot: { tables, tasks, shifts, stats, sentAt: Date.now() } });
+  }, [tables, tasks, shifts, stats]);
+
   // ---- derived, live state ----
   const recipients = new Map<number, number[]>();
-  for (const t of tables) recipients.set(t.id, recipientsFor(t, busy, now));
-  const alertedStaff = new Set([...recipients.values()].flat());
+  for (const t of tables) recipients.set(t.id, recipientsFor(t, tasks, shifts));
   const alertsFor = (staffId: number) =>
     tables
       .filter((t) => recipients.get(t.id)?.includes(staffId))
       .sort(alertOrder);
 
   const activeTables = tables.filter((t) => t.status !== "available").length;
-  const availableStaff = STAFF.filter((s) => isAvailable(s, busy, now)).length;
+  const availableStaff = STAFF.filter((s) => isFree(s.id, tasks, shifts)).length;
   const avgResponseS =
     responseTimes.length === 0
       ? null
@@ -276,18 +290,8 @@ export default function FloorDemo() {
   const overdueIds = waiting
     .filter((t) => secondsLeft(t.alertAt, now) === 0)
     .map((t) => t.id);
-  const escalatedIds = tables
-    .filter(
-      (t) =>
-        isAlerting(t) &&
-        t.alertAt !== null &&
-        now - t.alertAt >= ESCALATE_AFTER_S * 1000 &&
-        !overdueIds.includes(t.id)
-    )
-    .map((t) => t.id);
   const urgentAnnouncement = [
     overdueIds.length > 0 && `Overdue: ${listTables(overdueIds)}.`,
-    escalatedIds.length > 0 && `Runners called for ${listTables(escalatedIds)}.`,
   ]
     .filter(Boolean)
     .join(" ");
@@ -310,7 +314,7 @@ export default function FloorDemo() {
       servedBy: null,
       waitedMs: null,
     });
-    setAnnouncement(`Table ${id} needs greeting, Zone ${zoneOf(id)}.`);
+    setAnnouncement(`Table ${id} needs greeting. Every free waiter alerted.`);
     focusAfterRender(`table-${id}`);
   }
 
@@ -323,16 +327,9 @@ export default function FloorDemo() {
       servedBy: null,
       waitedMs: null,
     });
-    // Whoever was serving this table is free as soon as the guests leave, so
-    // their watch can pick up the cleaning alert instead of showing a stale
-    // "Serving Table N".
-    setBusy((b) => {
-      const next: BusyMap = {};
-      for (const [staffId, info] of Object.entries(b)) {
-        if (info.tableId !== id) next[Number(staffId)] = info;
-      }
-      return next;
-    });
+    // Whoever was still serving this table is done once the guests leave, so
+    // their watch can pick up new alerts instead of a stale "Serving Table N".
+    setTasks((ts) => withoutTable(ts, id));
     setAnnouncement(`Table ${id} needs cleaning.`);
     focusAfterRender(`table-${id}`);
   }
@@ -351,138 +348,103 @@ export default function FloorDemo() {
     setAnnouncement(`Rush hour: ${listTables([...ids])} need greeting.`);
   }
 
-  function attend(staffId: number, tableId: number) {
+  // First to accept takes the table: it stops alerting, so the card clears
+  // from every other watch, and this staff member gets the task until Done.
+  function accept(staffId: number, tableId: number) {
     const t = readClock();
     const table = tables.find((x) => x.id === tableId);
-    if (!table || table.status !== "needsGreeting" || table.alertAt === null) return;
-    const waited = t - table.alertAt;
-    const others = recipientsFor(table, busy, t).filter((id) => id !== staffId);
+    if (!table || !isAlerting(table) || !isFree(staffId, tasks, shifts)) return;
+    const name = staffName(staffId);
+    const others = recipientsFor(table, tasks, shifts).filter((id) => id !== staffId);
     setNow(t);
-    updateTable(tableId, { status: "dining", servedBy: staffId, waitedMs: waited });
-    setBusy((b) => ({
-      ...b,
-      [staffId]: { until: t + BUSY_AFTER_ATTEND_S * 1000, tableId, waitedMs: waited },
-    }));
-    setResponseTimes((r) => [...r, waited]);
+    // Silent performance log: alert fired → Accept, for greetings and cleaning.
+    const responseMs = table.alertAt === null ? 0 : Math.max(0, t - table.alertAt);
+    setStats((st) => {
+      const prev = st[staffId] ?? { accepted: 0, totalMs: 0 };
+      return {
+        ...st,
+        [staffId]: { accepted: prev.accepted + 1, totalMs: prev.totalMs + responseMs },
+      };
+    });
+    if (table.status === "needsGreeting" && table.alertAt !== null) {
+      const waited = t - table.alertAt;
+      updateTable(tableId, { status: "dining", servedBy: staffId, waitedMs: waited });
+      setTasks((ts) => ({ ...ts, [staffId]: { kind: "serve", tableId } }));
+      setResponseTimes((r) => [...r, waited]);
+      setAnnouncement(
+        `${name} accepted Table ${tableId} after ${Math.round(waited / 1000)} seconds.`
+      );
+    } else {
+      updateTable(tableId, { status: "cleaning", servedBy: staffId });
+      setTasks((ts) => ({ ...ts, [staffId]: { kind: "clean", tableId } }));
+      setAnnouncement(`${name} is cleaning Table ${tableId}.`);
+    }
     setNotices((n) => {
       const next: Notices = { ...n, [staffId]: null };
-      for (const id of others)
-        next[id] = { text: `Table ${tableId} taken by Waiter ${staffId}`, at: t };
+      for (const id of others) next[id] = { text: `Table ${tableId} taken by ${name}`, at: t };
       return next;
     });
-    setAnnouncement(
-      `Waiter ${staffId} attending Table ${tableId} after ${Math.round(waited / 1000)} seconds.`
-    );
-    focusAfterRender(`watch-${staffId}`, `mini-${staffId}`);
+    focusAfterRender(`watch-${staffId}`);
   }
 
-  function cleaned(staffId: number, tableId: number) {
+  // Done ends the task. For cleaning, that frees the table for the next guest.
+  function done(staffId: number) {
+    const task = tasks[staffId];
+    if (!task) return;
     const t = readClock();
-    const table = tables.find((x) => x.id === tableId);
-    if (!table || table.status !== "needsCleaning") return;
-    const others = recipientsFor(table, busy, t).filter((id) => id !== staffId);
     setNow(t);
-    updateTable(tableId, {
-      status: "available",
-      alertAt: null,
-      servedBy: null,
-      waitedMs: null,
-    });
-    setTablesTurned((n) => n + 1);
-    setNotices((n) => {
-      const next: Notices = {
-        ...n,
-        [staffId]: { text: `Table ${tableId} cleaned · now Available`, at: t },
-      };
-      for (const id of others)
-        next[id] = { text: `Table ${tableId} cleaned by Waiter ${staffId}`, at: t };
+    setTasks((ts) => {
+      const next = { ...ts };
+      delete next[staffId];
       return next;
     });
-    setAnnouncement(`Table ${tableId} cleaned and available.`);
-    focusAfterRender(`watch-${staffId}`, `mini-${staffId}`);
+    if (task.kind === "clean") {
+      const table = tables.find((x) => x.id === task.tableId);
+      if (table && table.status === "cleaning") {
+        updateTable(task.tableId, {
+          status: "available",
+          alertAt: null,
+          servedBy: null,
+          waitedMs: null,
+        });
+        setTablesTurned((n) => n + 1);
+      }
+      setAnnouncement(`Table ${task.tableId} cleaned and available.`);
+    } else {
+      setAnnouncement(`${staffName(staffId)} is free for new tables.`);
+    }
+    focusAfterRender(`watch-${staffId}`);
+  }
+
+  // Clock in, take a break or clock out from the watch. Finish the current
+  // task first: a break or clock-out is ignored while one is open.
+  function setShift(staffId: number, shift: Shift) {
+    if (shift !== "in" && tasks[staffId]) return;
+    setShifts((sh) => ({ ...sh, [staffId]: shift }));
+    setNotices((n) => ({ ...n, [staffId]: null }));
+    const name = staffName(staffId);
+    setAnnouncement(
+      shift === "in"
+        ? `${name} clocked in.`
+        : shift === "break"
+        ? `${name} is on a break.`
+        : `${name} clocked out.`
+    );
+    focusAfterRender(`watch-${staffId}`);
   }
 
   function resetDemo() {
     setTables(startingTables());
-    setBusy({});
+    setTasks({});
+    setShifts(startingShifts());
+    setStats({});
     setResponseTimes([]);
     setTablesTurned(0);
     setNotices({});
     setAnnouncement("Demo reset.");
   }
 
-  // Each group's big face: one per zone, and a runner once one is needed.
-  const leads = new Map<Role, Staff | null>();
-  for (const role of ["A", "B", "C", "Runner"] as Role[]) {
-    leads.set(
-      role,
-      pickLead(STAFF.filter((s) => s.role === role), alertsFor, busy, now, role === "Runner")
-    );
-  }
-
-  // One line per alerting table per group it reaches: to that group's big
-  // face when it is alerted, otherwise to the first alerted mini watch.
-  const links: AlertLink[] = [];
-  for (const t of tables) {
-    if (!isAlerting(t)) continue;
-    const left = secondsLeft(t.alertAt, now);
-    const tone: LinkTone =
-      t.status === "needsCleaning" ? "clean" : left <= URGENT_AT_S ? "urgent" : "wait";
-    const reached = recipients.get(t.id) ?? [];
-    for (const role of [t.zone, "Runner"] as Role[]) {
-      const inGroup = reached.filter((id) => STAFF.find((s) => s.id === id)?.role === role);
-      if (inGroup.length === 0) continue;
-      const lead = leads.get(role);
-      const toLead = !!lead && inGroup.includes(lead.id);
-      links.push({
-        tableId: t.id,
-        target: toLead ? `watch-${lead.id}` : `mini-${inGroup[0]}`,
-        mini: !toLead,
-        tone,
-        runner: role === "Runner",
-      });
-    }
-  }
-
-  const renderGroup = (role: Role, placeholder?: ReactNode) => {
-    const lead = leads.get(role) ?? null;
-    const others = STAFF.filter((s) => s.role === role && s.id !== lead?.id);
-    return (
-      <div data-wrists className="flex items-stretch gap-3">
-        <div className="flex min-w-0 flex-1 flex-col">
-          {lead ? (
-            <Watch
-              key={lead.id}
-              staff={lead}
-              alerts={alertsFor(lead.id)}
-              busyInfo={isBusy(busy, lead.id, now) ? busy[lead.id] : null}
-              now={now}
-              notice={visibleNotice(lead.id)}
-              onAttend={(tableId) => attend(lead.id, tableId)}
-              onCleaned={(tableId) => cleaned(lead.id, tableId)}
-            />
-          ) : (
-            placeholder
-          )}
-        </div>
-        <ul
-          aria-label={`Other watches, ${role === "Runner" ? "runners" : `Zone ${role}`}`}
-          className="flex w-[30%] shrink-0 flex-col gap-1.5 py-1.5"
-        >
-          {others.map((s) => (
-            <li key={s.id} className="flex flex-1">
-              <MiniWatch
-                staff={s}
-                alerts={alertsFor(s.id)}
-                busyInfo={isBusy(busy, s.id, now) ? busy[s.id] : null}
-                now={now}
-              />
-            </li>
-          ))}
-        </ul>
-      </div>
-    );
-  };
+  const freeStaff = availableStaff;
 
   return (
     <main className="flex min-h-dvh flex-col bg-ground text-ink lg:h-dvh lg:overflow-hidden">
@@ -495,24 +457,24 @@ export default function FloorDemo() {
 
       {/* Top bar */}
       <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex w-full max-w-[1800px] flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
-          <div className="mr-auto min-w-0">
-            <div className="flex flex-wrap items-baseline gap-x-3">
-              <h1 className="text-2xl font-bold tracking-tight">ZeroBell</h1>
-              <p className="flex items-baseline gap-1.5 text-sm">
-                <SeatIcon />
-                <span>
-                  <span className="font-semibold text-ink">Seat sensors detect each guest.</span>{" "}
-                  <span className="text-muted">Tap a table to simulate.</span>
-                </span>
-              </p>
-            </div>
-            <p className="text-sm text-muted">
-              Every guest greeted within {GREETING_LIMIT_S} seconds. No waving, no
-              bells.
+        <div className="mx-auto flex w-full max-w-[1800px] lg:max-w-[178vh] flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
+          <div className="min-w-0 flex-1 basis-80">
+            {/* The brand, then the promise as the headline, then how it works. */}
+            <h1 className="text-xl font-bold leading-tight tracking-tight">ZeroBell</h1>
+            <p className="text-lg font-semibold leading-snug text-ink [text-wrap:balance]">
+              Every guest greeted within {GREETING_LIMIT_S} seconds.{" "}
+              {/* Break between the sentences, never inside one. */}
+              <span className="sm:block">No waving, no bells.</span>
+            </p>
+            <p className="mt-0.5 flex items-baseline gap-1.5 text-sm">
+              <SeatIcon />
+              <span>
+                <span className="font-semibold text-ink">Seat sensors detect each guest.</span>{" "}
+                <span className="text-muted">Tap a table to simulate.</span>
+              </span>
             </p>
           </div>
-          <dl className="grid grid-cols-2 gap-x-8 gap-y-2 sm:grid-cols-4">
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
             <Metric label="Active tables" value={`${activeTables}/${TOTAL_TABLES}`} />
             <Metric label="Staff free" value={`${availableStaff}/${STAFF.length}`} />
             <Metric label="Avg response" value={avgResponse} tone={avgTone} />
@@ -532,86 +494,104 @@ export default function FloorDemo() {
             >
               Reset demo
             </button>
+            {phones && (
+              <div className="relative">
+                <button
+                  onClick={() => setPhoneOpen((o) => !o)}
+                  aria-expanded={phoneOpen}
+                  aria-controls="phone-panel"
+                  className="min-h-11 rounded-full border border-line px-4 text-sm text-muted transition-colors hover:bg-raised hover:text-ink"
+                >
+                  Phone
+                </button>
+                {phoneOpen && (
+                  <div
+                    id="phone-panel"
+                    className="absolute right-0 top-full z-30 mt-2 w-max max-w-[24rem] rounded-xl border border-line bg-surface p-4 text-sm shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
+                  >
+                    <p className="font-semibold text-ink">
+                      On a phone on the same Wi-Fi, scan or open:
+                    </p>
+                    {phones.length > 0 ? (
+                      phones.map((p) => (
+                        <div key={p.url} className="mt-3 flex flex-col items-center gap-2">
+                          {/* The QR is an SVG our own server generated from this address. */}
+                          <div
+                            role="img"
+                            aria-label={`QR code for ${p.url}`}
+                            className="w-48 overflow-hidden rounded-lg bg-white [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+                            dangerouslySetInnerHTML={{ __html: p.qr }}
+                          />
+                          <p className="select-all font-mono text-base text-ink">{p.url}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="mt-1 text-muted">No network found. Connect this laptop to Wi-Fi.</p>
+                    )}
+                    <p className="mt-2 text-muted">
+                      Pick a staff member there. The phone becomes their watch: Accept, Done and
+                      the shift buttons work on both screens.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </header>
 
       <div id="floor"
-        className="relative mx-auto flex w-full max-w-[1800px] flex-1 flex-col px-4 py-4 sm:px-6 lg:min-h-0">
-        <AlertLines links={links} />
+        className="relative mx-auto flex w-full max-w-[1800px] lg:max-w-[178vh] flex-1 flex-col px-4 py-4 sm:px-6 lg:min-h-0">
 
         <h2 id="floor-heading" className="sr-only">
-          Floor: each zone&apos;s waiters and their watches sit above its tables. Tap a
-          table to seat a guest; in the restaurant, a seat sensor does this.
+          Staff watches above, the floor below. Tap a table to seat a guest; in the
+          restaurant, a seat sensor does this.
         </h2>
-        <div className="grid grid-cols-1 gap-x-4 gap-y-8 md:grid-cols-2 lg:min-h-0 lg:flex-1 lg:grid-cols-4 lg:grid-rows-[auto_auto_minmax(0,1fr)] lg:gap-y-2 [--face-h:300px] lg:[--face-h:clamp(160px,calc(100dvh-470px),420px)]">
-          {ZONES.map((z) => {
-            const zoneStaff = STAFF.filter((s) => s.role === z.id);
-            const free = zoneStaff.filter((s) => isAvailable(s, busy, now)).length;
-            return (
-              <section
-                key={z.id}
-                aria-labelledby={`zone-${z.id}-heading`}
-                className="flex flex-col gap-2 lg:row-span-3 lg:grid lg:min-h-0 lg:grid-rows-subgrid lg:gap-y-2"
-              >
-                <h3
-                  id={`zone-${z.id}-heading`}
-                  className="flex items-baseline justify-between gap-2 pl-2 text-sm font-semibold"
-                >
-                  <span>
-                    Zone {z.id}{" "}
-                    <span className="font-normal text-muted">
-                      · Tables {z.first}–{z.last}
-                    </span>
-                  </span>
-                  <span className="text-xs font-normal text-muted">
-                    {free} of {zoneStaff.length} staff free
-                  </span>
-                </h3>
-                {renderGroup(z.id)}
-                <div
-                  data-tables
-                  className="grid auto-rows-[minmax(3.5rem,1fr)] grid-cols-2 gap-1.5 lg:mt-5 lg:min-h-0"
-                >
-                  {tables
-                    .filter((t) => t.zone === z.id)
-                    .map((t) => (
-                      <TableSeat
-                        key={t.id}
-                        table={t}
-                        now={now}
-                        alerted={recipients.get(t.id) ?? []}
-                        onGuestSat={() => guestSat(t.id)}
-                        onGuestLeft={() => guestLeft(t.id)}
-                      />
-                    ))}
-                </div>
-              </section>
-            );
-          })}
-          <section
-            aria-labelledby="runners-heading"
-            className="flex flex-col gap-2 lg:row-span-3 lg:grid lg:min-h-0 lg:grid-rows-subgrid lg:gap-y-2"
+        <div className="grid grid-cols-1 gap-y-3 lg:min-h-0 lg:flex-1 lg:grid-rows-[auto_auto_minmax(0,1fr)] lg:gap-y-2 [--face-h:300px] lg:[--face-h:clamp(6rem,calc(100dvh-29rem),40rem)]">
+          <h3 className="flex items-baseline justify-between gap-2 pl-2 text-base font-semibold">
+            <span>
+              Staff{" "}
+              <span className="font-normal text-muted">· every free band buzzes</span>
+            </span>
+            <span className="text-sm font-normal text-muted">
+              {freeStaff} of {STAFF.length} free
+            </span>
+          </h3>
+          <div
+            data-wrists
+            className="grid grid-cols-3 items-start gap-1.5 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-11"
           >
-            <h3
-              id="runners-heading"
-              className="flex items-baseline justify-between gap-2 pl-2 text-sm font-semibold"
-            >
-              Runners
-              <span className="text-xs font-normal text-muted">
-                Backup after {ESCALATE_AFTER_S}s
-              </span>
-            </h3>
-            {renderGroup(
-              "Runner",
-              <div className="flex min-h-24 flex-1 items-center justify-center rounded-[1.9rem] border-2 border-dashed border-line p-3 text-center text-sm text-muted">
-                Runners step in when a table waits {ESCALATE_AFTER_S}s
-              </div>
-            )}
-            <div className="lg:mt-5 lg:min-h-0">
-              <Roster busy={busy} now={now} alerted={alertedStaff} />
-            </div>
-          </section>
+            {STAFF.map((s) => (
+              <Watch
+                key={s.id}
+                staff={s}
+                shift={shifts[s.id]}
+                task={tasks[s.id] ?? null}
+                stats={stats[s.id] ?? null}
+                alerts={alertsFor(s.id)}
+                now={now}
+                notice={visibleNotice(s.id)}
+                onAccept={(tableId) => accept(s.id, tableId)}
+                onDone={() => done(s.id)}
+                onShift={(shift) => setShift(s.id, shift)}
+              />
+            ))}
+          </div>
+          <div
+            aria-label="Tables"
+            className="mt-4 grid auto-rows-[minmax(3.5rem,1fr)] grid-cols-2 gap-2 sm:grid-cols-3 lg:mt-3 lg:min-h-0 lg:grid-cols-6"
+          >
+            {tables.map((t) => (
+              <TableSeat
+                key={t.id}
+                table={t}
+                now={now}
+                alerted={recipients.get(t.id) ?? []}
+                onGuestSat={() => guestSat(t.id)}
+                onGuestLeft={() => guestLeft(t.id)}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </main>
@@ -641,117 +621,11 @@ function Metric({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="text-xs text-muted">{label}</dt>
+      <dt className="text-sm text-muted">{label}</dt>
       <dd className={`font-mono text-xl font-bold tabular-nums ${METRIC_TONE[tone]}`}>
         {value}
       </dd>
     </div>
-  );
-}
-
-// ---- alert lines ----------------------------------------------------------
-
-type LinkTone = "wait" | "urgent" | "clean";
-type AlertLink = { tableId: number; target: string; mini: boolean; tone: LinkTone; runner: boolean };
-
-// Same values as the wait / urgent / clean tokens in globals.css.
-const LINK_STROKE: Record<LinkTone, string> = {
-  wait: "#ffb000",
-  urgent: "#ff5a4f",
-  clean: "#6aa8ff",
-};
-
-// Draws a line from each lit table to the wrist it is buzzing (dashed for a
-// runner). The line leaves the table's left chair, climbs the gutter beside
-// the table (never across another table), crosses in the channel between the
-// floor and the wrists in its wrist's own lane, then rises to the strap.
-// Paths are kept per table-and-wrist pair: a line draws in once when its alert
-// starts, and later ticks only update its geometry.
-function AlertLines({ links }: { links: AlertLink[] }) {
-  const svgRef = useRef<SVGSVGElement>(null);
-
-  useLayoutEffect(() => {
-    const svg = svgRef.current;
-    const tablesTop = document.querySelector("[data-tables]");
-    if (!svg || !tablesTop) return;
-    const box = svg.getBoundingClientRect();
-    const floorTop = tablesTop.getBoundingClientRect().top - box.top;
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const seen = new Set<string>();
-    links.forEach((link, i) => {
-      const seat = document.getElementById(`seat-${link.tableId}`);
-      const table = document.getElementById(`table-${link.tableId}`);
-      const watch = document.getElementById(link.target);
-      const group = watch?.closest("[data-wrists]");
-      if (!seat || !table || !watch || !group) return;
-      const a = seat.getBoundingClientRect();
-      const t = table.getBoundingClientRect();
-      const b = watch.getBoundingClientRect();
-      const g = group.getBoundingClientRect();
-      const x0 = a.left - box.left; // the left chair
-      const y0 = a.top + a.height / 2 - box.top;
-      const xg = t.left - box.left - 3; // middle of the gutter
-      // The channel under the wrists, each line in its own lane.
-      const bendY = floorTop - 8 - (i % 4) * 4;
-      let d: string;
-      if (link.mini) {
-        // Mini watches stack on the group's right: climb the gutter beside
-        // the group and hook in from the right.
-        const xr = g.right - box.left + 5;
-        const ym = b.top + b.height / 2 - box.top;
-        d = `M ${x0} ${y0} H ${xg} V ${bendY} H ${xr} V ${ym} H ${b.right - box.left + 1}`;
-      } else {
-        // The big face has nothing beneath it: rise straight to its strap.
-        const x2 = b.left + b.width / 2 - box.left;
-        const y2 = b.bottom - box.top + 18;
-        d = `M ${x0} ${y0} H ${xg} V ${bendY} H ${x2} V ${y2}`;
-      }
-      const dash = link.runner ? "7 7" : "none";
-      const key = `${link.tableId}-${link.target}`;
-      seen.add(key);
-      let path = svg.querySelector<SVGPathElement>(`path[data-key="${key}"]`);
-      path?.setAttribute("d", d);
-      if (!path) {
-        const fresh = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        fresh.dataset.key = key;
-        fresh.setAttribute("class", "alert-line");
-        fresh.setAttribute("d", d);
-        svg.appendChild(fresh);
-        path = fresh;
-        if (!reduceMotion) {
-          const length = fresh.getTotalLength();
-          fresh.dataset.drawing = "1";
-          fresh.style.strokeDasharray = `${length}`;
-          const settle = () => {
-            if (!fresh.dataset.drawing) return;
-            delete fresh.dataset.drawing;
-            fresh.style.strokeDasharray = fresh.dataset.dash ?? "none";
-          };
-          fresh
-            .animate([{ strokeDashoffset: length }, { strokeDashoffset: 0 }], {
-              duration: 450,
-              easing: "cubic-bezier(0.16, 1, 0.3, 1)",
-            })
-            .finished.then(settle, settle);
-          // Animations can be held back in background tabs; settle anyway.
-          setTimeout(settle, 600);
-        }
-      }
-      path.style.stroke = LINK_STROKE[link.tone];
-      path.dataset.dash = dash;
-      if (!path.dataset.drawing) path.style.strokeDasharray = dash;
-    });
-    for (const path of svg.querySelectorAll<SVGPathElement>("path[data-key]")) {
-      if (!seen.has(path.dataset.key ?? "")) path.remove();
-    }
-  });
-
-  return (
-    <svg
-      ref={svgRef}
-      aria-hidden
-      className="pointer-events-none absolute inset-0 z-20 hidden h-full w-full lg:block"
-    />
   );
 }
 
@@ -794,20 +668,12 @@ function TableSeat({
       ? "free"
       : table.status === "dining"
       ? "dining"
-      : table.status === "needsCleaning"
+      : table.status === "needsCleaning" || table.status === "cleaning"
       ? "cleaning"
       : left <= URGENT_AT_S
       ? "urgent"
       : "waiting";
-  const runnersIn = alerted.some(
-    (id) => STAFF.find((s) => s.id === id)?.role === "Runner"
-  );
-  const reach =
-    alerted.length === 0
-      ? "No staff free"
-      : runnersIn
-      ? `${alerted.length} + runners`
-      : `${alerted.length} alerted`;
+  const reach = alerted.length === 0 ? "No staff free" : `${alerted.length} alerted`;
   const spoken =
     table.status === "available"
       ? "free"
@@ -816,7 +682,9 @@ function TableSeat({
         ? "needs greeting"
         : "overdue"
       : table.status === "dining"
-      ? `dining, served by Waiter ${table.servedBy}`
+      ? `dining, served by ${staffName(table.servedBy)}`
+      : table.status === "cleaning"
+      ? `being cleaned by ${staffName(table.servedBy)}`
       : "needs cleaning";
 
   let line1: ReactNode;
@@ -829,22 +697,26 @@ function TableSeat({
     case "needsGreeting":
       line1 = (
         <span
-          className={`font-mono text-base font-bold tabular-nums ${
+          className={`font-mono text-lg font-bold tabular-nums ${
             state === "urgent" ? "text-urgent" : "text-wait"
           }`}
         >
-          {left > 0 ? mmss(left) : "Overdue"}
+          {left > 0 ? mmss(left) : `+${secondsLate(table.alertAt, now)}s late`}
         </span>
       );
       line2 = <span className="text-muted">{reach}</span>;
       break;
     case "dining":
-      line1 = <span className="font-semibold text-greeted">Waiter {table.servedBy}</span>;
+      line1 = <span className="font-semibold text-greeted">{staffName(table.servedBy)}</span>;
       line2 = <span className="text-muted">Tap: guest left</span>;
       break;
     case "needsCleaning":
       line1 = <span className="font-semibold text-clean">To clean</span>;
       line2 = <span className="text-muted">{reach}</span>;
+      break;
+    case "cleaning":
+      line1 = <span className="font-semibold text-clean">Cleaning</span>;
+      line2 = <span className="text-muted">{staffName(table.servedBy)}</span>;
       break;
   }
 
@@ -855,11 +727,11 @@ function TableSeat({
       ? { onClick: onGuestLeft, label: `Guest Left Table ${table.id}` }
       : null;
 
-  const tileClass = `flex h-full w-full min-w-0 flex-col items-start justify-center rounded-lg border-2 px-2 py-1 text-left text-xs transition-colors ${SEAT_TILE[state]}`;
+  const tileClass = `flex h-full w-full min-w-0 flex-col items-start justify-center rounded-lg border-2 px-2.5 py-1.5 text-left text-sm transition-colors ${SEAT_TILE[state]}`;
   const tileBody = (
     <>
       <span className="flex w-full min-w-0 flex-wrap items-baseline justify-between gap-x-2">
-        <span className="text-sm font-bold text-ink">T{table.id}</span>
+        <span className="text-base font-bold text-ink">T{table.id}</span>
         <span className="whitespace-nowrap">{line1}</span>
       </span>
       {line2 && <span className="line-clamp-2 w-full leading-tight">{line2}</span>}
@@ -895,81 +767,6 @@ function TableSeat({
   );
 }
 
-// ---- roster ---------------------------------------------------------------
-
-function Roster({
-  busy,
-  now,
-  alerted,
-}: {
-  busy: BusyMap;
-  now: number;
-  alerted: Set<number>;
-}) {
-  const onBreak = STAFF.filter((s) => s.onBreak).length;
-  const busyCount = STAFF.filter((s) => !s.onBreak && isBusy(busy, s.id, now)).length;
-  const available = STAFF.length - onBreak - busyCount;
-  const pct = (n: number) => `${(n / STAFF.length) * 100}%`;
-
-  return (
-    <section
-      aria-labelledby="staff-heading"
-      className="relative z-10 flex min-w-0 flex-col gap-2 rounded-xl border border-line bg-surface p-3 lg:h-full lg:overflow-y-auto"
-    >
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 id="staff-heading" className="text-base font-semibold">
-          Shift · {STAFF.length} staff
-        </h2>
-        <p className="text-sm text-muted">
-          <span className="text-ink">{available} free</span> ·{" "}
-          <span className="text-greeted">{busyCount} serving</span> · {onBreak} on break
-        </p>
-      </div>
-      <div className="flex h-2 w-full overflow-hidden rounded-full bg-raised">
-        <div className="bg-ink transition-all" style={{ width: pct(available) }} />
-        <div className="bg-greeted transition-all" style={{ width: pct(busyCount) }} />
-      </div>
-      <ul className="flex flex-col gap-1">
-        {ROSTER_GROUPS.map((g) => (
-          <li key={g.role} className="flex items-center gap-3">
-            <span className="w-12 shrink-0 text-xs font-semibold text-muted">{g.label}</span>
-            <div className="flex flex-wrap gap-1">
-              {STAFF.filter((s) => s.role === g.role).map((s) => {
-                const isB = !s.onBreak && isBusy(busy, s.id, now);
-                const isAlerted = alerted.has(s.id);
-                const state = s.onBreak ? "On Break" : isB ? "Busy Serving" : "Available";
-                const chipClass = s.onBreak
-                  ? "border border-dashed border-line text-dim"
-                  : isB
-                  ? "bg-greeted-tint text-greeted ring-1 ring-greeted"
-                  : isAlerted
-                  ? "bg-urgent-tint text-ink ring-2 ring-urgent"
-                  : "bg-raised text-ink ring-1 ring-line";
-                return (
-                  <span
-                    key={s.id}
-                    title={`Waiter ${s.id} · ${roleLabel(s.role)} · ${state}${
-                      isAlerted ? " · alerted" : ""
-                    }`}
-                    className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-mono text-xs font-semibold ${chipClass}`}
-                  >
-                    W{s.id}
-                    {s.onBreak && <span className="font-sans font-normal">break</span>}
-                  </span>
-                );
-              })}
-            </div>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-auto flex items-center gap-1.5 text-xs text-muted">
-        <span className="h-3 w-3 shrink-0 rounded-sm ring-2 ring-urgent" aria-hidden /> Ringed:
-        alerted now
-      </p>
-    </section>
-  );
-}
-
 // ---- icons (drawn, one stroke weight) ---------------------------------------
 
 function SeatIcon() {
@@ -983,247 +780,251 @@ function SeatIcon() {
   );
 }
 
-function CheckIcon() {
-  return (
-    <svg aria-hidden viewBox="0 0 24 24" className="h-[2.2em] w-[2.2em]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 12.5l4.5 4.5L19 7.5" />
-    </svg>
-  );
-}
-
-function WipeIcon() {
-  return (
-    <svg aria-hidden viewBox="0 0 24 24" className="h-[2.2em] w-[2.2em]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <ellipse cx="12" cy="15" rx="9" ry="4" />
-      <path d="M8 9c1.5-1 3-1 4 0s2.5 1 4 0M9 5.5c1-.7 2-.7 3 0s2 .7 3 0" />
-    </svg>
-  );
-}
-
 // ---- wrist ----------------------------------------------------------------
 
-// A small watch for everyone in the group who isn't on the big face: it
-// still flashes when alerted, so the whole zone's reach stays visible.
-function MiniWatch({
-  staff,
-  alerts,
-  busyInfo,
-  now,
-}: {
-  staff: Staff;
-  alerts: Table[];
-  busyInfo: BusyInfo | null;
-  now: number;
-}) {
-  const top = alerts[0];
-  let faceClass = "bg-face text-white";
-  let state: ReactNode = <span className="text-muted">Ready</span>;
-  let spoken = "ready";
-  if (staff.onBreak) {
-    faceClass = "bg-face opacity-60";
-    state = <span className="text-dim">On break</span>;
-    spoken = "on break";
-  } else if (top && top.status === "needsGreeting") {
-    const left = secondsLeft(top.alertAt, now);
-    faceClass = "alert-flash text-white";
-    state = (
-      <span className="font-mono tabular-nums">
-        T{top.id} {mmss(left).slice(3)}s
-      </span>
-    );
-    spoken = `alerted, Table ${top.id}`;
-  } else if (top) {
-    faceClass = "bg-face-clean text-white";
-    state = <span>Clean T{top.id}</span>;
-    spoken = `clean Table ${top.id}`;
-  } else if (busyInfo) {
-    faceClass = "bg-face-busy text-white";
-    state = <span>Serving T{busyInfo.tableId}</span>;
-    spoken = `serving Table ${busyInfo.tableId}`;
-  }
+// Face height: the row's target height, unless the column is too narrow for a
+// face that tall (the face keeps a 0.82 width-to-height ratio inside a thin
+// bezel). Type in the face scales with it: tighter in the narrow faces of the
+// 11-watch row, roomier (with fuller labels) on a wide face such as the phone.
+const FACE_H = "min(var(--face-h), calc((100cqw - 0.75rem) / 0.82))";
+
+// A small round avatar: the staff member's initials (demo staff, no photos).
+function Avatar({ name, dim }: { name: string; dim?: boolean }) {
   return (
-    <div
-      id={`mini-${staff.id}`}
-      tabIndex={-1}
-      aria-label={`Waiter ${staff.id}, ${spoken}`}
-      className={`flex w-full min-w-0 flex-col justify-center rounded-xl border-2 border-bezel px-2 py-1 leading-tight transition-colors ${faceClass}`}
+    <span
+      aria-hidden
+      className={`flex h-[1.55em] w-[1.55em] shrink-0 items-center justify-center rounded-full bg-raised font-bold ring-1 ring-white/25 ${dim ? "opacity-60" : ""}`}
     >
-      <span className="font-mono text-sm font-bold">W{staff.id}</span>
-      <span className="truncate text-xs">{state}</span>
-    </div>
+      <span className="text-[0.62em] tracking-wide text-ink">{initials(name)}</span>
+    </span>
   );
 }
 
-// Face height: the row's target height, unless the column is too narrow for a
-// face that tall (the face keeps a 0.82 width-to-height ratio inside its bezel).
-const FACE_H = "min(var(--face-h), calc((100cqw - 1.75rem) / 0.82))";
-
-function Watch({
+export function Watch({
   staff,
+  shift,
+  task,
+  stats,
   alerts,
-  busyInfo,
   now,
   notice,
-  onAttend,
-  onCleaned,
+  onAccept,
+  onDone,
+  onShift,
 }: {
   staff: Staff;
+  shift: Shift;
+  task: Task | null;
+  stats: StaffStats | null;
   alerts: Table[];
-  busyInfo: BusyInfo | null;
   now: number;
   notice: string | null;
-  onAttend: (tableId: number) => void;
-  onCleaned: (tableId: number) => void;
+  onAccept: (tableId: number) => void;
+  onDone: () => void;
+  onShift: (shift: Shift) => void;
 }) {
   const top = alerts[0];
-  const isRunner = staff.role === "Runner";
-  const more =
-    alerts.length > 1 ? (
-      <p className="w-full truncate text-[0.85em] font-semibold leading-tight">
-        +{alerts.length - 1} more:{" "}
-        {alerts
-          .slice(1)
-          .map((t) => `T${t.id}`)
-          .join(", ")}
-      </p>
-    ) : null;
-  // Where the alert came from; shown when the face has room for it.
-  const sourceNote = (t: Table, sensor: boolean) =>
-    isRunner ? (
-      <p className="hidden text-[0.85em] leading-tight @[11rem]:block">Backup for Zone {t.zone}</p>
-    ) : sensor ? (
-      <p className="hidden text-[0.85em] leading-tight @[11rem]:block">Seat sensor alert</p>
-    ) : null;
-  const actionClass =
-    "mt-[0.15em] min-h-11 w-full rounded-full bg-white py-[0.4em] text-[1em] font-extrabold active:scale-95 lg:min-h-0";
+  const more = alerts.length - 1;
+  // Labels and controls that only fit on a wide face (the phone).
+  const roomy = "hidden @[10rem]:flex";
+  const bigButton =
+    "mt-[0.25em] min-h-11 w-full rounded-full py-[0.35em] text-[1em] font-extrabold uppercase tracking-wide active:scale-95 lg:min-h-0";
+  const smallButton =
+    "min-h-11 flex-1 whitespace-nowrap rounded-full border border-current/40 px-[0.4em] py-[0.3em] text-[0.8em] font-semibold active:scale-95 lg:min-h-0 @[10rem]:text-[0.62em]";
+  // The profile's performance line: tasks accepted and average response.
+  const avgS = stats && stats.accepted > 0 ? stats.totalMs / stats.accepted / 1000 : null;
+  const profileStats = (
+    <dl className={`${roomy} w-full justify-center gap-[0.8em] rounded-lg bg-white/[0.06] px-[0.4em] py-[0.25em] text-[0.62em]`}>
+      <div className="flex flex-col items-center">
+        <dt className="text-muted">Accepted</dt>
+        <dd className="font-mono text-[1.35em] font-bold tabular-nums text-ink">{stats?.accepted ?? 0}</dd>
+      </div>
+      <div className="flex flex-col items-center">
+        <dt className="text-muted">Avg response</dt>
+        <dd className="font-mono text-[1.35em] font-bold tabular-nums text-ink">
+          {avgS === null ? "—" : `${avgS.toFixed(1)}s`}
+        </dd>
+      </div>
+    </dl>
+  );
+  const tableBig = (id: number) => (
+    <p className="flex flex-col items-center leading-none">
+      <span className="hidden text-[0.75em] font-semibold uppercase tracking-widest @[10rem]:block">
+        Table
+      </span>
+      <span className="text-[1.5em] font-black tabular-nums @[10rem]:text-[2.6em]">
+        <span className="@[10rem]:hidden">T</span>
+        {id}
+      </span>
+    </p>
+  );
 
-  let faceClass = "bg-face";
-  let statusText = "Ready";
-  let statusClass = "text-muted";
-  let dotClass = "bg-dim";
+  let faceClass = "bg-face text-white";
+  let status = "Ready";
+  let dotClass = "bg-greeted";
+  let spoken = "on shift, ready";
   let body: ReactNode;
 
-  if (staff.onBreak) {
-    faceClass = "bg-face opacity-60";
-    statusText = "Off";
+  if (shift !== "in") {
+    // Asleep: no table alerts until they clock back in.
+    const onBreak = shift === "break";
+    faceClass = "bg-[#08070d] text-dim";
+    status = onBreak ? "Break" : "Off";
+    dotClass = "bg-dim";
+    spoken = onBreak ? "on a break, no alerts" : "clocked out, no alerts";
     body = (
       <>
-        <p className="text-[1.15em] font-bold text-muted">On break</p>
-        <p className="text-[0.85em] leading-tight text-dim">No alerts</p>
+        <p className="text-[1.1em] font-bold text-muted">{onBreak ? "On break" : "Clocked out"}</p>
+        <p className={`${roomy} text-[0.8em]`}>No table alerts</p>
+        {profileStats}
+        <div className="flex w-full gap-[0.3em]">
+          <button
+            onClick={() => onShift("in")}
+            aria-label={`${onBreak ? "End break" : "Clock in"} (${staff.name})`}
+            className={`${smallButton} border-greeted/60 text-greeted`}
+          >
+            {onBreak ? "End break" : "Clock in"}
+          </button>
+          {onBreak && (
+            <button
+              onClick={() => onShift("out")}
+              aria-label={`Clock out (${staff.name})`}
+              className={`${smallButton} hidden text-muted @[10rem]:block`}
+            >
+              Clock out
+            </button>
+          )}
+        </div>
       </>
     );
-  } else if (top && top.status === "needsGreeting") {
-    const left = secondsLeft(top.alertAt, now);
-    faceClass = "alert-flash";
-    statusText = "Alert";
-    statusClass = "text-white";
+  } else if (task) {
+    // The accepted job, until Done.
+    const cleaning = task.kind === "clean";
+    faceClass = cleaning ? "bg-face-clean text-white" : "bg-face-busy text-white";
+    status = cleaning ? "Cleaning" : "Serving";
     dotClass = "bg-white";
+    spoken = `${cleaning ? "cleaning" : "serving"} Table ${task.tableId}`;
     body = (
       <>
-        <p className="text-[1.1em] font-bold leading-tight">Table {top.id}</p>
-        {sourceNote(top, true)}
-        <p className="font-mono text-[2.1em] font-bold leading-none tabular-nums">{mmss(left)}</p>
-        {more ?? (
-          <p className="text-[0.85em] font-semibold uppercase tracking-wider">
-            {left > 0 ? "Greet now" : "Overdue!"}
-          </p>
-        )}
+        <p className="text-[0.8em] font-semibold uppercase tracking-widest">
+          {cleaning ? "Cleaning" : "Serving"}
+        </p>
+        {tableBig(task.tableId)}
         <button
-          onClick={() => onAttend(top.id)}
-          aria-label={`Attending Table ${top.id} (Waiter ${staff.id})`}
-          className={`${actionClass} text-red-700`}
+          onClick={onDone}
+          aria-label={`Done with Table ${task.tableId} (${staff.name})`}
+          className={`${bigButton} bg-white ${cleaning ? "text-face-clean" : "text-face-busy"}`}
         >
-          Attending
+          Done
         </button>
       </>
     );
   } else if (top) {
-    faceClass = "bg-face-clean";
-    statusText = "Clean";
-    statusClass = "text-white";
-    dotClass = "bg-white";
+    // The alert card: high contrast, the table number large, one big Accept.
+    const cleaning = top.status === "needsCleaning";
+    const phase = alertPhase(top.alertAt, now);
+    const calm = !cleaning && phase === "wait";
+    faceClass = cleaning ? "bg-face-clean text-white" : PHASE_FACE[phase];
+    status = cleaning ? "Clean" : phase === "wait" ? "New guest" : phase === "urgent" ? "Hurry" : "Late";
+    dotClass = calm ? "bg-ground" : "bg-white";
+    spoken = cleaning ? `Table ${top.id} needs cleaning` : `new guest at Table ${top.id}`;
     body = (
       <>
-        <WipeIcon />
-        <p className="text-[1.1em] font-bold leading-tight">Clean Table {top.id}</p>
-        {sourceNote(top, false)}
-        {more}
+        {tableBig(top.id)}
+        <p className={`${roomy} text-[0.85em] font-semibold leading-tight`}>
+          {cleaning
+            ? "Needs cleaning"
+            : phase === "wait"
+            ? "New guest seated"
+            : phase === "urgent"
+            ? "Guest still waiting"
+            : `Past ${GREETING_LIMIT_S} seconds`}
+        </p>
         <button
-          onClick={() => onCleaned(top.id)}
-          aria-label={`Cleaned Table ${top.id} (Waiter ${staff.id})`}
-          className={`${actionClass} text-blue-700`}
+          onClick={() => onAccept(top.id)}
+          aria-label={`Accept Table ${top.id} (${staff.name})`}
+          className={`${bigButton} ${
+            calm ? "bg-ground text-wait" : cleaning ? "bg-white text-face-clean" : "bg-white text-alert"
+          }`}
         >
-          Cleaned
+          Accept
         </button>
-      </>
-    );
-  } else if (busyInfo) {
-    faceClass = "bg-face-busy";
-    statusText = "Busy";
-    statusClass = "text-white";
-    dotClass = "bg-white";
-    const freeIn = Math.max(0, Math.ceil((busyInfo.until - now) / 1000));
-    body = (
-      <>
-        <span className="hidden @[11rem]:block">
-          <CheckIcon />
-        </span>
-        <p className="font-mono text-[2.1em] font-bold leading-none tabular-nums">
-          {Math.round(busyInfo.waitedMs / 1000)}s
-        </p>
-        <p className="text-[0.85em] font-semibold uppercase tracking-wider">Greeted</p>
-        <p className="text-[0.85em] leading-tight">
-          Table {busyInfo.tableId} · free in {freeIn}s
-        </p>
       </>
     );
   } else {
+    // Home: ready for tables, with the shift controls.
     body = (
       <>
-        <p className="text-[1.25em] font-bold text-ink">Ready</p>
+        <p className="text-[1.15em] font-bold text-ink">Ready</p>
         {notice ? (
-          <p className="w-full rounded-lg bg-white/10 px-1.5 py-1 text-[0.85em] leading-tight text-ink">
+          <p className={`${roomy} rounded-lg bg-white/10 px-[0.4em] py-[0.2em] text-[0.8em] leading-tight text-ink`}>
             {notice}
           </p>
         ) : (
-          <p className="text-[0.85em] leading-tight text-muted">Waiting for a table</p>
+          <p className={`${roomy} text-[0.8em] text-muted`}>Waiting for tables</p>
         )}
+        {profileStats}
+        <div className={`${roomy} w-full gap-[0.3em]`}>
+          <button
+            onClick={() => onShift("break")}
+            aria-label={`Take break (${staff.name})`}
+            className={`${smallButton} text-muted`}
+          >
+            Take break
+          </button>
+          <button
+            onClick={() => onShift("out")}
+            aria-label={`Clock out (${staff.name})`}
+            className={`${smallButton} text-muted`}
+          >
+            Clock out
+          </button>
+        </div>
       </>
     );
   }
+
+  const textOn = faceClass.includes("text-ground") ? "text-ground" : "";
 
   return (
     <div className="@container relative z-10 flex min-w-0 flex-col items-center">
       {/* strap */}
-      <div className="h-1.5 w-[38%] rounded-t-lg bg-raised" />
-      <div className="relative max-w-full rounded-[1.9rem] border-4 border-bezel bg-ground p-1.5">
+      <div className="h-1 w-[38%] rounded-t-md bg-raised" />
+      <div className="relative max-w-full rounded-[1.1rem] border-2 border-bezel bg-ground p-1">
         {/* crown */}
-        <div className="absolute -right-2 top-[30%] h-[18%] w-1.5 rounded-r-md bg-bezel" />
+        <div className="absolute -right-1.5 top-[30%] h-[18%] w-1 rounded-r-sm bg-bezel" />
         <div
           id={`watch-${staff.id}`}
           role="group"
           tabIndex={-1}
-          aria-label={`Waiter ${staff.id} watch${isRunner ? ", runner" : `, Zone ${staff.role}`}`}
+          aria-label={`${staff.name}'s watch, ${spoken}`}
           style={{
             height: FACE_H,
             width: `calc(${FACE_H} * 0.82)`,
-            fontSize: `clamp(13px, calc(${FACE_H} * 0.072), 20px)`,
+            fontSize: `clamp(11px, calc(${FACE_H} * var(--fs)), 3rem)`,
           }}
-          className={`flex max-w-full flex-col items-center gap-[0.3em] overflow-hidden rounded-[1.5rem] px-[0.7em] py-[0.7em] text-center text-white transition-colors ${faceClass}`}
+          className={`flex max-w-full flex-col items-center gap-[0.25em] overflow-hidden rounded-[0.85rem] px-[0.45em] py-[0.45em] text-center transition-colors [--fs:0.12] @[10rem]:[--fs:0.095] ${faceClass}`}
         >
-          <div className="flex w-full items-center justify-between gap-1 whitespace-nowrap text-[0.85em] font-semibold uppercase tracking-wide">
-            <span className="font-mono">W{staff.id}</span>
-            <span className={`flex items-center gap-1 ${statusClass}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />
-              {statusText}
-            </span>
+          {/* Profile: avatar and name, then status */}
+          <div className={`flex w-full min-w-0 items-center gap-[0.3em] text-[0.85em] font-semibold ${textOn}`}>
+            <Avatar name={staff.name} dim={shift !== "in"} />
+            <span className="min-w-0 flex-1 truncate text-left">{staff.name}</span>
+            {more > 0 && (
+              <span className="hidden shrink-0 rounded-full bg-black/25 px-[0.4em] font-mono @[10rem]:inline">
+                +{more}
+              </span>
+            )}
+            <span
+              title={status}
+              className={`h-[0.45em] w-[0.45em] shrink-0 rounded-full ${dotClass}`}
+            />
           </div>
-          <div className="flex w-full flex-1 flex-col items-center justify-center gap-[0.3em]">
+          <div className="flex w-full flex-1 flex-col items-center justify-center gap-[0.25em]">
             {body}
           </div>
         </div>
       </div>
-      <div className="h-1.5 w-[38%] rounded-b-lg bg-raised" />
+      <div className="h-1 w-[38%] rounded-b-md bg-raised" />
     </div>
   );
 }

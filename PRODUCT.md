@@ -17,8 +17,9 @@ restaurant experience. They watch; they do not operate the app themselves.
 
 ZeroBell gets every guest in a full-service restaurant greeted within 15
 seconds of sitting down, without the guest having to wave, ring a bell or press
-anything. A seat sensor detects the guest and alerts waiters' smartbands; a
-waiter claims the table by tapping "Attending".
+anything. A seat sensor detects the guest and alerts the watches of every
+clocked-in staff member; the first to tap "Accept" takes the table, and the
+alert clears from everyone else's watch.
 
 Success for the demo: a judge sees a guest sit, sees the right staff alerted
 instantly, sees someone claim the table, and believes the 15-second promise.
@@ -34,23 +35,38 @@ make.
 
 - Shown only on a projector by a presenter during a hackathon pitch (FeedMe ×
   Southern University College 3-Day Startup Hackathon, November 2026).
-- Simulated restaurant: 12 tables in 3 zones (A: 1–4, B: 5–8, C: 9–12) and
-  11 staff (3 per zone plus 2 runners; 1 on break at the start).
+- Simulated restaurant: 12 tables on one open floor and 11 staff with no
+  zones, each with a demo name and initials avatar (one on a break and one
+  clocked out at the start).
 - "Guest Sat" and "Guest Left" buttons stand in for seat sensors; on-screen
   smartwatch faces stand in for real smartbands.
-- A "Simulate Rush Hour" control seats 3–4 random tables across zones at once.
+- A "Simulate Rush Hour" control seats 3–4 random tables at once.
 
 ## Capabilities and Constraints
 
-- Alert routing: the table's zone staff who are free are alerted at once;
-  runners are added if nobody claims it within 8 seconds, or straight away if
-  the zone has nobody free.
-- Table lifecycle: Available → Needs Greeting (15-second countdown) → Dining →
-  Needs Cleaning → Available.
-- A waiter who attends is "Busy Serving" for 12 seconds and receives no new
-  alerts in that time.
-- Terminology in use: Guest Sat, Guest Left, Attending, Cleaned, Needs
-  Greeting, Needs Cleaning, Busy Serving, On Break, Runner, Zone, Tables Turned.
+- One watch per staff member, showing their avatar and name, with on-watch
+  shift controls: Clock In, Take Break (End Break) and Clock Out. Staff on a
+  break or clocked out get no table alerts; their watch sleeps.
+- Grab-style dispatch: when a table needs a greeting or cleaning, every
+  clocked-in staff member without a task gets a high-contrast card (table
+  number and a large Accept). The first to Accept takes it; the card clears
+  from all other watches at once, and their watch shows "Serving Table X" or
+  "Cleaning Table X" with Done. They get no new alerts until Done.
+  (Zones and runner escalation were dropped on 14 November 2026.)
+- Silent performance tracking: every Accept logs the response time (alert
+  fired → Accept, for greetings and cleaning) against that staff member. Their
+  profile view shows tasks accepted and average response speed; nothing is
+  shown during an alert. Stats live in the laptop demo's memory and reset with
+  Reset demo.
+- A phone companion (/watch) turns a phone on the same Wi-Fi into one staff
+  member's watch, mirroring the laptop demo; it needs the laptop's dev server.
+- Table lifecycle: Available → Needs Greeting (15-second countdown) → Dining
+  (accepted) → Needs Cleaning (guest left) → Cleaning (accepted) → Available
+  (Done). Done after a greeting ends that staff member's task; the table stays
+  dining until the guest leaves.
+- Terminology in use: Guest Sat, Guest Left, Accept, Done, Clock In, Take
+  Break, Clock Out, Needs Greeting, Needs Cleaning, Serving, Cleaning, On Break,
+  Clocked Out, Tables Turned.
 - Web only: Next.js App Router, TypeScript, Tailwind CSS, local sample data, no
   login, no backend. Native mobile frameworks are out of scope.
 - Undecided: what happens when a countdown reaches 0 (manager escalation is
@@ -75,7 +91,8 @@ make.
    wrist lights up.
 3. The 15-second promise is the measure; make keeping it and missing it
    equally obvious.
-4. Routing is the intelligence: zone first, runners as backup.
+4. Everyone free hears the guest: the whole floor is alerted at once and the
+   first waiter to respond takes the table.
 5. Built for a presenter on a projector: readable from the back of a room,
    understandable without narration.
 

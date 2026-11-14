@@ -44,11 +44,34 @@
   --color-face-clean: #1d4ed8;
 }
 
-/* Scale type up on big screens so the back of the room can read it:
-   16px at 1280 wide and below, rising to 20px at 1920. */
-html {
-  font-size: clamp(16px, calc(8px + 0.625vw), 20px);
+/* Alert face reds. A plain @theme (not inline) so these also exist as CSS
+   variables for the flash keyframes. White text passes on all of them:
+   alert-lo 7.6:1, alert-hi 4.8:1, alert 6.5:1, alert-late 10.4:1. */
+@theme {
+  --color-alert-lo: #991b1b;
+  --color-alert-hi: #dc2626;
+  --color-alert: #b91c1c;
+  --color-alert-late: #7f1d1d;
 }
+
+/* The stage scales like a slide. From 1024px wide the root size is a fixed
+   share of the screen (1.25% of the width, or of the 16:9 width that the
+   height allows, whichever is smaller), and every rem in the layout follows
+   it. So every 16:9 projector shows the same picture as the tuned 1280x720
+   layout, only sharper: 16px at 1280x720, 17px at 1366x768, 20px at
+   1600x900, 24px at 1920x1080, 32px at 2560x1440, 48px at 4K. A short
+   window (a browser with its toolbar showing) scales by its height instead,
+   so it never overflows. Phones and tablets keep 16px. */
+html {
+  font-size: 16px;
+}
+
+@media (min-width: 1024px) {
+  html {
+    font-size: clamp(12px, min(1.25vw, 2.2222vh), 48px);
+  }
+}
+
 
 body {
   background: var(--background);
@@ -68,31 +91,22 @@ body {
   color: #15131f;
 }
 
-/* Red flashing wrist face for a new-guest alert. Both ends of the flash keep
-   white text above 4.5:1 (red-800 7.6:1, red-600 4.8:1). */
+/* The alert gets hotter as the promise runs out: a calm amber face when the
+   guest sits, this red flash in the last 5 seconds, then solid alert-late
+   (with a "late" counter) once 15 seconds pass. */
 @keyframes alert-flash {
   0%,
   100% {
-    background-color: #991b1b;
+    background-color: var(--color-alert-lo);
   }
   50% {
-    background-color: #dc2626;
+    background-color: var(--color-alert-hi);
   }
 }
 
 .alert-flash {
-  background-color: #b91c1c;
+  background-color: var(--color-alert);
   animation: alert-flash 1s ease-in-out infinite;
-}
-
-/* The line from a lit table to the wrist it buzzes; it draws itself in
-   (scripted in AlertLines) once per alert. */
-.alert-line {
-  fill: none;
-  stroke-width: 3;
-  stroke-opacity: 0.9;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 @media (prefers-reduced-motion: reduce) {
