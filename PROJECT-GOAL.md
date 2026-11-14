@@ -61,19 +61,23 @@ In one browser page, with no login:
 ## Journey 2: Camera mode (optional)
 
 ### Goal
-The laptop webcam watches the pass, and TypeSafe's Jev decides whether each
-slot holds a plate, so nobody has to press "Place plate" or "Picked up". The
-rest of the demo (bands, escalation, metrics, phones) works exactly as in
-Journey 1.
+A camera watches the pass, and TypeSafe's Jev decides whether each slot holds
+a plate, so nobody has to press "Place plate" or "Picked up". The rest of the
+demo (bands, escalation, metrics, phones) works exactly as in Journey 1.
+
+In a real restaurant the camera is the restaurant's **existing CCTV**, brought
+in through a **USB capture card** (see "Camera source" below). For the pitch, a
+laptop webcam or an iPhone (Continuity Camera) stands in for it. The app treats
+all of these the same way: each is just a camera in the picker.
 
 ### Evidence
 On the same page, running locally on the laptop:
 
 - A "Camera mode" toggle. Off by default, and the demo behaves exactly as
   before when it is off.
-- A camera picker lists the laptop's cameras (for example the built-in
-  webcam, or an iPhone through Continuity Camera), so the camera can face the
-  pass.
+- A camera picker lists every camera the laptop sees: the built-in webcam, an
+  iPhone through Continuity Camera, or a USB capture card carrying the CCTV
+  picture.
 - When on, a live webcam preview appears. The tester drags a box over the image
   for each of the 4 slots, and the boxes stay in place after a page reload on
   the same laptop.
@@ -93,6 +97,13 @@ On the same page, running locally on the laptop:
 - If the call fails, or Jev is unsure, that slot shows **"Camera unsure"** and
   nothing changes. An error is never treated as "no plate".
 - "Place plate" and "Picked up" still work in Camera mode as a backup.
+- **Change-gating:** before each check the laptop compares a tiny grey copy of
+  each slot with the one Jev last judged (free, no AI). Only changed slots are
+  sent, plus the second confirming check and a safety re-check every 5 minutes.
+- **Opening hours:** a weekly schedule (default every day 10:00–22:00, 84 hours
+  a week) pauses checks outside opening hours, with "Closed now: camera
+  paused" on screen. A "Pause outside opening hours" switch turns this off for
+  demos and rehearsals.
 
 ### Required conditions
 - The TypeSafe key stays on the laptop's server (an API route reading
@@ -104,6 +115,33 @@ On the same page, running locally on the laptop:
   after Accept is switched off, because the real camera now decides when the
   plate has gone.
 
+### Camera source: the restaurant's CCTV through a USB capture card
+- The restaurant's DVR already shows its cameras on a monitor through HDMI. A
+  USB HDMI capture card (about RM50–150) takes that picture into a small
+  computer next to the DVR (or the restaurant's existing desktop), where it
+  appears as an ordinary camera. No new camera is mounted, and no DVR login or
+  brand-specific setup is needed.
+- The DVR's HDMI output usually shows **a grid of cameras**, and that is fine:
+  on the first visit we mark the slot boxes on the pass camera's tile, and only
+  what is inside those boxes is sent to Jev. The app does not care that the
+  rest of the screen is other cameras.
+- Two things keep this working:
+  - **Resolution:** a tile in a 4×4 grid is small, so a slot may be only a
+    few dozen pixels. Set the DVR output to its highest resolution and use a
+    capture card that accepts it. If the slots are too small to judge, fall
+    back to one-area mode (see Later).
+  - **A fixed layout:** the boxes are positions on the screen. Turn off the
+    DVR's auto-cycle (sequence) mode, and keep the grid layout the same. If
+    someone changes the layout or opens one camera full-screen, the boxes land
+    on the wrong picture.
+- Only the cropped slot areas are sent for detection, never the full CCTV frame,
+  so staff and customer faces do not leave the restaurant (a PDPA selling
+  point).
+- **Camera check at onboarding:** mark the slots on one frame with a plate and
+  one without. Above 70% with a plate and below 30% without means the CCTV
+  view is good enough. Readings stuck around 40–60% mean this restaurant needs a
+  fallback (see Later).
+
 ### Smallest journey
 1. The tester turns on Camera mode, allows the webcam, and marks the 4 slots on
    the preview.
@@ -114,8 +152,18 @@ On the same page, running locally on the laptop:
    top bar shows the time waited.
 
 ## Later
-- Real dish detection from a webcam or the restaurant's CCTV, running on a
-  small box in the restaurant so video is not sent to the cloud.
+- Fallbacks when the CCTV is blurry or cannot see the pass closely:
+  - **One-area mode:** treat the whole pass as one area ("Is there food waiting
+    on the pass?") instead of 4 slots.
+  - **Add-on pass camera:** an extra CCTV camera on the DVR (about RM100–200) or a
+    small webcam aimed at the pass.
+  - **No camera:** a button or tablet tap at the pass for the cook, replacing
+    the kitchen bell.
+- Lower detection cost: only ask Jev when the slot image has changed from the
+  last check, instead of every 3 seconds.
+- Read the CCTV straight from the DVR's network stream (RTSP) instead of a
+  capture card, once a restaurant shares its DVR login.
+- Run detection on a small box in the restaurant so no images leave it.
 - Real hardware bands (ESP32/nRF52 with an RGB LED, vibration motor and button,
   about US$8–15 each) or off-the-shelf wrist pagers for a first pilot.
 - Adjustable timings per restaurant (for example longer for hotpot).
@@ -128,3 +176,5 @@ _Updated on 14 November 2026: pivoted from greeting new guests (ZeroBell) to
 monitoring food waiting at the kitchen pass, to avoid overlapping with FeedMe._
 _Updated on 14 November 2026: added Journey 2, an optional Camera mode where
 TypeSafe's Jev detects plates from the laptop webcam._
+_Updated on 14 November 2026: the real-restaurant camera source is the existing
+CCTV through a USB capture card; webcam and iPhone stand in for the pitch._

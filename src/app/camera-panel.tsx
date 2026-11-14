@@ -2,19 +2,28 @@
 
 // Camera mode: a live webcam preview where the 4 pass slots are marked, and a
 // loop that crops each slot every few seconds and asks Jev (through our own
-// /api/detect route) whether a plate is there.
+// /api/detect route) whether a plate is there. Slots whose picture has not
+// changed are skipped, and nothing is checked outside opening hours.
 
 import { useEffect, useRef, useState } from "react";
 import {
   CHECK_EVERY_MS,
   CROP_MAX_SIDE,
   CROP_MIN_SIDE,
+  DEFAULT_HOURS,
   NEW_TRACK,
+  THUMB_SIZE,
+  imageDifference,
+  isOpenAt,
+  needsCheck,
   readingFor,
   stepTrack,
+  weeklyHours,
+  type DayHours,
   type JevCheckResponse,
   type Reading,
   type Track,
+  type WeekHours,
 } from "./camera-rules";
 
 export type Box = { x: number; y: number; w: number; h: number }; // 0..1 of the frame
@@ -22,6 +31,28 @@ export type SlotCamera = { reading: Reading | "error"; p: number | null };
 
 const BOXES_KEY = "zerobell.camera.boxes";
 const DEVICE_KEY = "zerobell.camera.device";
+const HOURS_KEY = "zerobell.camera.hours";
+const USE_HOURS_KEY = "zerobell.camera.useHours";
+
+// Shown Monday first; stored Sunday first (Date.getDay()).
+const DAYS = [
+  { i: 1, name: "Mon" },
+  { i: 2, name: "Tue" },
+  { i: 3, name: "Wed" },
+  { i: 4, name: "Thu" },
+  { i: 5, name: "Fri" },
+  { i: 6, name: "Sat" },
+  { i: 0, name: "Sun" },
+];
+
+function hoursSummary(week: WeekHours) {
+  const first = week[0];
+  const same = week.every((d) => d.closed === first.closed && d.open === first.open && d.close === first.close);
+  const total = weeklyHours(week);
+  const h = `${Number.isInteger(total) ? total : total.toFixed(1)} hours a week`;
+  if (same && !first.closed) return `Every day ${first.open}–${first.close} · ${h}`;
+  return `Custom hours · ${h}`;
+}
 
 const BOX_COLOURS = ["#38d39f", "#6aa8ff", "#ffb000", "#ff7ad9"];
 
@@ -65,6 +96,31 @@ function cropJpeg(video: HTMLVideoElement, box: Box): string {
   return canvas.toDataURL("image/jpeg", 0.85).split(",")[1];
 }
 
+// A tiny grey copy of one slot, for the free "has anything changed?" test.
+function thumbnail(video: HTMLVideoElement, box: Box): Uint8Array {
+  const canvas = document.createElement("canvas");
+  canvas.width = THUMB_SIZE;
+  canvas.height = THUMB_SIZE;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  ctx.drawImage(
+    video,
+    box.x * video.videoWidth,
+    box.y * video.videoHeight,
+    Math.max(1, box.w * video.videoWidth),
+    Math.max(1, box.h * video.videoHeight),
+    0,
+    0,
+    THUMB_SIZE,
+    THUMB_SIZE
+  );
+  const rgba = ctx.getImageData(0, 0, THUMB_SIZE, THUMB_SIZE).data;
+  const grey = new Uint8Array(THUMB_SIZE * THUMB_SIZE);
+  for (let i = 0; i < grey.length; i++) {
+    grey[i] = Math.round(0.299 * rgba[i * 4] + 0.587 * rgba[i * 4 + 1] + 0.114 * rgba[i * 4 + 2]);
+  }
+  return grey;
+}
+
 export default function CameraPanel({
   slotIds,
   resets,
@@ -90,15 +146,45 @@ export default function CameraPanel({
 
   const [lastError, setLastError] = useState<string | null>(null);
   const [status, setStatus] = useState<Record<number, SlotCamera>>({});
+  const statusRef = useRef<Record<number, SlotCamera>>({});
+
+  const [hours, setHours] = useState<WeekHours>(() => load(HOURS_KEY, DEFAULT_HOURS));
+  const [useHours, setUseHours] = useState<boolean>(() => load(USE_HOURS_KEY, true));
+  const [editingHours, setEditingHours] = useState(false);
+  // A clock for the "Open now / Closed now" line, so it is right even when
+  // the camera is not running.
+  const [clock, setClock] = useState(0);
+  useEffect(() => {
+    const tick = () => setClock(Date.now());
+    const first = setTimeout(tick);
+    const id = setInterval(tick, 15_000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+    };
+  }, []);
+  const closed = clock !== 0 && useHours && !isOpenAt(hours, new Date(clock));
 
   // Latest values for the check loop, which outlives renders.
-  const live = useRef({ boxes, onSeen, onStatus });
+  const live = useRef({ boxes, onSeen, onStatus, hours, useHours });
   useEffect(() => {
-    live.current = { boxes, onSeen, onStatus };
+    live.current = { boxes, onSeen, onStatus, hours, useHours };
   });
   const tracks = useRef<Record<number, Track>>({});
+  // Per slot: the thumbnail Jev last judged, and when.
+  const judged = useRef<Record<number, { thumb: Uint8Array; at: number }>>({});
+  const forget = (slotId?: number) => {
+    if (slotId === undefined) {
+      tracks.current = {};
+      judged.current = {};
+    } else {
+      tracks.current[slotId] = NEW_TRACK;
+      delete judged.current[slotId];
+    }
+  };
   useEffect(() => {
     tracks.current = {};
+    judged.current = {};
   }, [resets]);
 
   // ---- the camera ----
@@ -154,14 +240,45 @@ export default function CameraPanel({
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
 
+    let wasClosed = false;
+
     async function check() {
       const video = videoRef.current;
-      const { boxes } = live.current;
+      const { boxes, hours, useHours } = live.current;
+
+      // Outside opening hours: no checks at all.
+      const isClosed = useHours && !isOpenAt(hours, new Date());
+      if (isClosed) {
+        if (!wasClosed) {
+          judged.current = {}; // look afresh when the restaurant opens
+          statusRef.current = {};
+          setStatus({});
+          live.current.onStatus({});
+        }
+        wasClosed = true;
+        return;
+      }
+      wasClosed = false;
+
       const marked = slotIds.filter((id) => boxes[id]);
       if (!video || video.videoWidth === 0 || marked.length === 0) return;
 
+      // Free test first: which slots changed since Jev last judged them?
       const capturedAt = Date.now();
-      const crops = marked.map((slotId) => ({ slotId, jpegBase64: cropJpeg(video, boxes[slotId]) }));
+      const thumbs: Record<number, Uint8Array> = {};
+      const toAsk = marked.filter((slotId) => {
+        thumbs[slotId] = thumbnail(video, boxes[slotId]);
+        const last = judged.current[slotId];
+        return needsCheck({
+          track: tracks.current[slotId] ?? NEW_TRACK,
+          difference: last ? imageDifference(thumbs[slotId], last.thumb) : Infinity,
+          lastAskedAt: last?.at ?? 0,
+          now: capturedAt,
+        });
+      });
+      if (toAsk.length === 0) return; // nothing changed: no call, no cost
+
+      const crops = toAsk.map((slotId) => ({ slotId, jpegBase64: cropJpeg(video, boxes[slotId]) }));
       let result: JevCheckResponse;
       try {
         const res = await fetch("/api/detect", {
@@ -177,16 +294,24 @@ export default function CameraPanel({
 
       setLastError(result.ok ? null : result.error);
 
-      const next: Record<number, SlotCamera> = {};
-      for (const slotId of marked) {
+      const updates: Record<number, SlotCamera> = {};
+      for (const slotId of toAsk) {
         const p = result.ok ? result.answers[slotId] ?? null : null;
         // A failed call is "unsure", never "no plate".
         const reading: Reading = result.ok ? readingFor(p) : "unsure";
-        next[slotId] = { reading: result.ok ? reading : "error", p };
+        updates[slotId] = { reading: result.ok ? reading : "error", p };
+        // Remember what Jev judged; after a failure, ask again next check.
+        if (result.ok) judged.current[slotId] = { thumb: thumbs[slotId], at: capturedAt };
+        else delete judged.current[slotId];
         const { track, change } = stepTrack(tracks.current[slotId] ?? NEW_TRACK, reading, capturedAt);
         tracks.current[slotId] = track;
         if (change) live.current.onSeen(slotId, change.seen, change.at);
       }
+      // Skipped slots keep their last answer.
+      const prev = statusRef.current;
+      const next: Record<number, SlotCamera> = {};
+      for (const id of marked) if (updates[id] ?? prev[id]) next[id] = updates[id] ?? prev[id];
+      statusRef.current = next;
       setStatus(next);
       live.current.onStatus(next);
     }
@@ -233,20 +358,27 @@ export default function CameraPanel({
     const next = { ...boxes, [marking]: box };
     setBoxes(next);
     save(BOXES_KEY, next);
-    tracks.current[marking] = NEW_TRACK; // a new area starts fresh
+    forget(marking); // a new area starts fresh
     const unmarked = slotIds.find((id) => !next[id]);
     if (unmarked !== undefined) setMarking(unmarked);
   }
   function clearBoxes() {
     setBoxes({});
     save(BOXES_KEY, {});
-    tracks.current = {};
+    forget();
+    statusRef.current = {};
     setStatus({});
     onStatus({});
     setMarking(slotIds[0]);
   }
 
   const markedCount = slotIds.filter((id) => boxes[id]).length;
+
+  function setDay(i: number, patch: Partial<DayHours>) {
+    const next = hours.map((d, j) => (j === i ? { ...d, ...patch } : d));
+    setHours(next);
+    save(HOURS_KEY, next);
+  }
 
   return (
     <section aria-labelledby="camera-heading" className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4">
@@ -261,7 +393,7 @@ export default function CameraPanel({
             onChange={(e) => {
               setDeviceId(e.target.value);
               save(DEVICE_KEY, e.target.value);
-              tracks.current = {};
+              forget();
             }}
             className="min-h-11 max-w-64 rounded-lg border border-line bg-raised px-3 text-sm"
           >
@@ -366,6 +498,91 @@ export default function CameraPanel({
               </button>
             </div>
             {markedCount === 0 && <p className="mt-2 text-wait">No slots marked yet, so no slots are being checked.</p>}
+          </div>
+
+          <div>
+            <p className="font-semibold">Opening hours</p>
+            <p className="text-muted">
+              {useHours ? hoursSummary(hours) : "Ignoring opening hours: checking all the time."}
+            </p>
+            {clock !== 0 && (
+              <p className={`mt-1 font-semibold ${closed ? "text-wait" : "text-greeted"}`} role="status">
+                {closed ? "Closed now: camera paused" : "Open now: checking"}
+              </p>
+            )}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setEditingHours((e) => !e)}
+                aria-expanded={editingHours}
+                aria-controls="hours-editor"
+                className="min-h-11 rounded-full border border-line px-4 text-muted hover:bg-raised hover:text-ink"
+              >
+                {editingHours ? "Done" : "Edit hours"}
+              </button>
+              <label className="flex min-h-11 items-center gap-2 text-muted">
+                <input
+                  type="checkbox"
+                  checked={useHours}
+                  onChange={(e) => {
+                    setUseHours(e.target.checked);
+                    save(USE_HOURS_KEY, e.target.checked);
+                  }}
+                  className="h-4 w-4"
+                />
+                Pause outside opening hours
+              </label>
+            </div>
+            {editingHours && (
+              <div id="hours-editor" className="mt-2 flex flex-col gap-1">
+                {DAYS.map(({ i, name }) => {
+                  const d = hours[i];
+                  return (
+                    <div key={i} className="flex flex-wrap items-center gap-2">
+                      <label className="flex w-20 items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={!d.closed}
+                          onChange={(e) => setDay(i, { closed: !e.target.checked })}
+                          aria-label={`Open on ${name}`}
+                          className="h-4 w-4"
+                        />
+                        {name}
+                      </label>
+                      {d.closed ? (
+                        <span className="text-muted">Closed</span>
+                      ) : (
+                        <>
+                          <input
+                            type="time"
+                            value={d.open}
+                            onChange={(e) => e.target.value && setDay(i, { open: e.target.value })}
+                            aria-label={`${name} opens`}
+                            className="min-h-9 rounded-lg border border-line bg-raised px-2"
+                          />
+                          <span className="text-muted">to</span>
+                          <input
+                            type="time"
+                            value={d.close}
+                            onChange={(e) => e.target.value && setDay(i, { close: e.target.value })}
+                            aria-label={`${name} closes`}
+                            className="min-h-9 rounded-lg border border-line bg-raised px-2"
+                          />
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+                <button
+                  onClick={() => {
+                    setHours(DEFAULT_HOURS);
+                    save(HOURS_KEY, DEFAULT_HOURS);
+                  }}
+                  className="mt-1 min-h-11 self-start rounded-full border border-line px-4 text-muted hover:bg-raised hover:text-ink"
+                >
+                  Reset to every day 10:00–22:00
+                </button>
+              </div>
+            )}
           </div>
 
           {lastError && <p className="text-urgent">Last call failed: {lastError} Slots show Camera unsure.</p>}

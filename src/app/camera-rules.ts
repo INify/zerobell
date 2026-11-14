@@ -73,6 +73,95 @@ export function stepTrack(
   return { track, change: { seen: r, at: track.firstAt } };
 }
 
+// ---------------------------------------------------------------------------
+// Change-gating: only ask Jev about a slot when its picture has changed.
+// The laptop compares a tiny grey thumbnail of each slot with the one Jev last
+// judged. That costs nothing; asking Jev costs money.
+// ---------------------------------------------------------------------------
+
+export const THUMB_SIZE = 24; // thumbnails are 24 x 24 grey pixels
+// Average difference per pixel (0-255) that counts as "changed". In tests,
+// camera noise, exposure shifts and blocky compression scored 2-4, and a plate
+// arriving scored 11-20. Tune on real CCTV footage at the first pilot.
+export const CHANGE_THRESHOLD = 6;
+// Even when nothing seems to change, ask again this often as a safety check.
+// Every 5 minutes: once a minute alone was about 5% of all checks, half the
+// AI budget, while a real change is caught by the change test anyway.
+export const RECHECK_EVERY_MS = 5 * 60_000;
+
+// How different two thumbnails are, ignoring an overall brightness shift (a
+// camera adjusting its exposure should not count as a change).
+export function imageDifference(a: ArrayLike<number>, b: ArrayLike<number>): number {
+  const n = Math.min(a.length, b.length);
+  if (n === 0) return Infinity;
+  let meanA = 0;
+  let meanB = 0;
+  for (let i = 0; i < n; i++) {
+    meanA += a[i];
+    meanB += b[i];
+  }
+  meanA /= n;
+  meanB /= n;
+  let diff = 0;
+  for (let i = 0; i < n; i++) diff += Math.abs(a[i] - meanA - (b[i] - meanB));
+  return diff / n;
+}
+
+// Should this slot be sent to Jev on this check?
+export function needsCheck(opts: {
+  track: Track;
+  difference: number; // vs the thumbnail Jev last judged (Infinity if none)
+  lastAskedAt: number; // 0 if never
+  now: number;
+}): boolean {
+  const { track, difference, lastAskedAt, now } = opts;
+  if (difference >= CHANGE_THRESHOLD) return true; // something changed (or never asked)
+  if (track.run !== null && track.run !== track.confirmed) return true; // waiting for the 2nd agreeing check
+  return now - lastAskedAt >= RECHECK_EVERY_MS; // safety re-check
+}
+
+// ---------------------------------------------------------------------------
+// Opening hours: the camera only checks while the restaurant is open.
+// ---------------------------------------------------------------------------
+
+export type DayHours = { closed: boolean; open: string; close: string }; // "HH:MM", 24-hour
+export type WeekHours = DayHours[]; // index 0 = Sunday, as in Date.getDay()
+
+// Default: open every day 10:00-22:00 (12 hours a day, 84 a week).
+export const DEFAULT_HOURS: WeekHours = Array.from({ length: 7 }, () => ({
+  closed: false,
+  open: "10:00",
+  close: "22:00",
+}));
+
+function minutes(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+}
+
+// Length of a day's opening, in minutes. A closing time at or before the
+// opening time runs past midnight; the same time means open all day.
+function span(d: DayHours): number {
+  if (d.closed) return 0;
+  const o = minutes(d.open);
+  const c = minutes(d.close);
+  return c > o ? c - o : c + 1440 - o;
+}
+
+export function isOpenAt(week: WeekHours, date: Date): boolean {
+  const day = date.getDay();
+  const t = date.getHours() * 60 + date.getMinutes();
+  const today = week[day];
+  if (today && !today.closed && t >= minutes(today.open) && t < minutes(today.open) + span(today)) return true;
+  // Yesterday's opening that runs past midnight.
+  const y = week[(day + 6) % 7];
+  return !!y && !y.closed && t < minutes(y.open) + span(y) - 1440;
+}
+
+export function weeklyHours(week: WeekHours): number {
+  return week.reduce((sum, d) => sum + span(d), 0) / 60;
+}
+
 // What the browser sends to /api/detect and gets back.
 export type JevCheckRequest = { crops: { slotId: number; jpegBase64: string }[] };
 export type JevCheckResponse =
