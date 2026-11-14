@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import CameraPanel, { type SlotCamera } from "./camera-panel";
 import { isLocalHost, postSync, type SyncAction } from "./sync";
 
 // ---------------------------------------------------------------------------
@@ -79,6 +80,18 @@ export const STAFF: Staff[] = [
 ].map((name, i) => ({ id: i + 1, name }));
 
 const SLOT_COUNT = 4;
+const SLOT_IDS = Array.from({ length: SLOT_COUNT }, (_, i) => i + 1);
+
+// Camera mode needs a webcam, which browsers only allow on a secure page, and
+// our /api/jev route, which only runs on the laptop. So: localhost only.
+const noSubscribe = () => () => {};
+function cameraSupported() {
+  return (
+    isLocalHost(window.location.hostname) &&
+    window.isSecureContext &&
+    typeof navigator.mediaDevices?.getUserMedia === "function"
+  );
+}
 
 export function staffName(id: number | null) {
   return STAFF.find((s) => s.id === id)?.name ?? "Staff";
@@ -272,12 +285,24 @@ export default function PassDemo() {
   const [now, setNow] = useState(0);
   const [announcement, setAnnouncement] = useState("");
 
+  // ---- Camera mode ----
+  const canUseCamera = useSyncExternalStore(noSubscribe, cameraSupported, () => false);
+  const [cameraOn, setCameraOn] = useState(false);
+  const [cameraStatus, setCameraStatus] = useState<Record<number, SlotCamera>>({});
+  const [resets, setResets] = useState(0); // tells the camera to look afresh
+  // In Camera mode the real camera decides when a plate leaves, so the
+  // simulated "plate leaves 5s after Accept" is switched off.
+  const cameraOnRef = useRef(cameraOn);
+  useEffect(() => {
+    cameraOnRef.current = cameraOn;
+  });
+
   // Tick: move the clock and escalate waiting plates as thresholds pass.
   useEffect(() => {
     const id = setInterval(() => {
       const t = Date.now();
       setNow(t);
-      setWorld((w) => reconcile(autoPickUp(w, t), t));
+      setWorld((w) => reconcile(cameraOnRef.current ? w : autoPickUp(w, t), t));
     }, 250);
     return () => clearInterval(id);
   }, []);
@@ -355,6 +380,41 @@ export default function PassDemo() {
     setAnnouncement(`Plate waiting at slot ${slotId}. One free waiter alerted.`);
   }
 
+  // Jev confirmed (2 checks in a row) that a plate arrived or left. `at` is
+  // the first check that saw it, so the wait is measured from then.
+  function cameraSees(slotId: number, seen: "plate" | "empty", at: number) {
+    const t = Date.now();
+    setNow(t);
+    setWorld((w) => {
+      const slot = w.slots.find((s) => s.id === slotId);
+      if (!slot) return w;
+      if (seen === "plate") {
+        if (slot.plateAt !== null) return w;
+        return reconcile(
+          {
+            ...w,
+            slots: w.slots.map((s) =>
+              s.id === slotId ? { ...s, plateAt: at, alerted: [], takenBy: null } : s
+            ),
+          },
+          t
+        );
+      }
+      if (slot.plateAt === null) return w;
+      return reconcile(pickUp(w, slotId, Math.max(at, slot.plateAt)), t);
+    });
+    setAnnouncement(
+      seen === "plate"
+        ? `Camera: plate waiting at slot ${slotId}.`
+        : `Camera: slot ${slotId} picked up.`
+    );
+  }
+
+  function toggleCamera() {
+    setCameraOn((on) => !on);
+    setCameraStatus({});
+  }
+
   function rushHour() {
     const t = Date.now();
     setNow(t);
@@ -412,6 +472,7 @@ export default function PassDemo() {
 
   function resetDemo() {
     setWorld(startingWorld());
+    setResets((n) => n + 1);
     setAnnouncement("Demo reset.");
   }
 
@@ -424,7 +485,9 @@ export default function PassDemo() {
     : null;
 
   return (
-    <main className="flex min-h-dvh flex-col bg-ground text-ink lg:h-dvh lg:overflow-hidden">
+    <main
+      className={`flex min-h-dvh flex-col bg-ground text-ink ${cameraOn ? "" : "lg:h-dvh lg:overflow-hidden"}`}
+    >
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {announcement}
       </div>
@@ -440,7 +503,9 @@ export default function PassDemo() {
             </p>
             <p className="mt-0.5 text-sm">
               <span className="font-semibold">A camera at the pass spots each plate.</span>{" "}
-              <span className="text-muted">Tap Place plate to simulate.</span>
+              <span className="text-muted">
+                {cameraOn ? "Jev is watching the pass camera." : "Tap Place plate to simulate."}
+              </span>
             </p>
           </div>
           <dl className="grid grid-cols-3 gap-x-6 gap-y-1 sm:grid-cols-5 lg:grid-cols-3 xl:grid-cols-5">
@@ -466,6 +531,19 @@ export default function PassDemo() {
             >
               Simulate Rush Hour
             </button>
+            {canUseCamera && (
+              <button
+                onClick={toggleCamera}
+                aria-pressed={cameraOn}
+                className={`min-h-11 rounded-full border px-4 text-sm font-bold transition-colors ${
+                  cameraOn
+                    ? "border-greeted bg-greeted-tint text-greeted"
+                    : "border-line text-muted hover:bg-raised hover:text-ink"
+                }`}
+              >
+                Camera mode: {cameraOn ? "on" : "off"}
+              </button>
+            )}
             <button
               onClick={resetDemo}
               className="min-h-11 rounded-full border border-line px-4 text-sm text-muted transition-colors hover:bg-raised hover:text-ink"
@@ -517,6 +595,8 @@ export default function PassDemo() {
       </header>
 
       <div className="mx-auto flex w-full max-w-[1800px] flex-1 flex-col gap-4 px-4 py-4 sm:px-6 lg:min-h-0 lg:max-w-[178vh]">
+        {cameraOn && <CameraPanel slotIds={SLOT_IDS} resets={resets} onSeen={cameraSees} onStatus={setCameraStatus} />}
+
         {/* The pass */}
         <section aria-labelledby="pass-heading" className="flex flex-col gap-2 lg:min-h-0 lg:flex-1">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 pl-1">
@@ -533,6 +613,10 @@ export default function PassDemo() {
                 now={now}
                 onPlace={() => placePlate(s.id)}
                 onPickedUp={() => pickedUp(s.id)}
+                cameraUnsure={
+                  cameraOn &&
+                  (cameraStatus[s.id]?.reading === "unsure" || cameraStatus[s.id]?.reading === "error")
+                }
               />
             ))}
           </div>
@@ -623,12 +707,17 @@ function PassSlot({
   now,
   onPlace,
   onPickedUp,
+  cameraUnsure,
 }: {
   slot: Slot;
   now: number;
   onPlace: () => void;
   onPickedUp: () => void;
+  cameraUnsure: boolean;
 }) {
+  const unsureBadge = cameraUnsure && (
+    <p className="rounded-full border border-wait px-3 py-0.5 text-sm font-bold text-wait">Camera unsure</p>
+  );
   if (slot.plateAt === null) {
     return (
       <div
@@ -637,6 +726,7 @@ function PassSlot({
       >
         <p className="text-lg font-bold">Slot {slot.id}</p>
         <p className="text-muted">Empty</p>
+        {unsureBadge}
         {slot.lastWaitMs !== null && (
           <p className="text-sm">
             Last plate picked up after{" "}
@@ -683,6 +773,7 @@ function PassSlot({
         </p>
       )}
       <p className={`text-sm ${slot.takenBy !== null ? "font-semibold text-clean" : "text-muted"}`}>{who}</p>
+      {unsureBadge}
       <button
         onClick={onPickedUp}
         aria-label={`Picked up from slot ${slot.id}`}
