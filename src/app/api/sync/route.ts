@@ -31,7 +31,10 @@ function lanUrls(port: string) {
   const urls: string[] = [];
   for (const nets of Object.values(os.networkInterfaces())) {
     for (const net of nets ?? []) {
-      if (net.family === "IPv4" && !net.internal) urls.push(`http://${net.address}:${port}/watch`);
+      // 169.254.x.x is a self-assigned address on a direct cable link (such as
+      // an iPhone plugged in for the camera); phones on Wi-Fi cannot reach it.
+      if (net.family === "IPv4" && !net.internal && !net.address.startsWith("169.254."))
+        urls.push(`http://${net.address}:${port}/watch`);
     }
   }
   return urls;
