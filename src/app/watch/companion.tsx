@@ -72,7 +72,7 @@ function Picker({ snap }: { snap: Snapshot | null }) {
   return (
     <main className="flex min-h-dvh flex-col gap-6 bg-ground px-4 py-6 text-ink">
       <header>
-        <p className="text-sm font-semibold text-muted">ZeroBell Pass band</p>
+        <p className="text-sm font-semibold text-muted">ZeroBell band</p>
         <h1 className="text-2xl font-bold tracking-tight">Who is wearing this band?</h1>
         <p className="mt-1 text-base text-muted">
           When a plate waits at the pass, one free waiter&apos;s band lights up and buzzes. Press

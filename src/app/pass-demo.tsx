@@ -433,7 +433,7 @@ export default function PassDemo() {
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex w-full max-w-[1800px] flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6 lg:max-w-[178vh]">
           <div className="min-w-0 flex-1 basis-80">
-            <h1 className="text-xl font-bold leading-tight tracking-tight">ZeroBell Pass</h1>
+            <h1 className="text-xl font-bold leading-tight tracking-tight">ZeroBell</h1>
             <p className="text-lg font-semibold leading-snug [text-wrap:balance]">
               No dish waits at the pass.{" "}
               <span className="sm:block">Picked up hot, within {LATE_S} seconds.</span>

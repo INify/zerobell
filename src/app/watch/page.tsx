@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import Companion from "./companion";
 
 export const metadata: Metadata = {
-  title: "ZeroBell Pass · Waiter band",
-  description: "Phone band for the ZeroBell Pass demo: one waiter's band, live from the laptop.",
+  title: "ZeroBell · Waiter band",
+  description: "Phone band for the ZeroBell demo: one waiter's band, live from the laptop.",
 };
 
 export const viewport: Viewport = {

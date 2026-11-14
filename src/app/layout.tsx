@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ZeroBell Pass · kitchen pass monitor",
+  title: "ZeroBell · kitchen pickup alerts",
   description:
     "A camera at the kitchen pass alerts waiters on cheap screenless bands, so no dish waits.",
 };
