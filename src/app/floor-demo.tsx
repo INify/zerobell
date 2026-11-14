@@ -58,8 +58,8 @@ const STAFF: Staff[] = [
   { id: 15, role: "Runner", onBreak: false },
 ];
 
-// The three watches shown on screen.
-const FEATURED_STAFF = [1, 2, 3];
+// The watches shown on screen: one per zone, plus a runner.
+const FEATURED_STAFF = [1, 2, 4, 3];
 
 const ROSTER_GROUPS: { label: string; role: Role }[] = [
   { label: "Zone A", role: "A" },
@@ -412,7 +412,7 @@ export default function FloorDemo() {
               {ESCALATE_AFTER_S}s.
             </p>
           </div>
-          <div className="grid grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-3">
+          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 sm:gap-3">
             {FEATURED_STAFF.map((id) => {
               const staff = STAFF.find((s) => s.id === id);
               if (!staff) return null;
