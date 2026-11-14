@@ -2,7 +2,7 @@
 
 // Camera mode: a live webcam preview where the 4 pass slots are marked, and a
 // loop that crops each slot every few seconds and asks Jev (through our own
-// /api/jev route) whether a plate is there.
+// /api/detect route) whether a plate is there.
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -164,7 +164,7 @@ export default function CameraPanel({
       const crops = marked.map((slotId) => ({ slotId, jpegBase64: cropJpeg(video, boxes[slotId]) }));
       let result: JevCheckResponse;
       try {
-        const res = await fetch("/api/jev", {
+        const res = await fetch("/api/detect", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ crops }),
@@ -252,7 +252,7 @@ export default function CameraPanel({
     <section aria-labelledby="camera-heading" className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="camera-heading" className="text-base font-semibold">
-          Camera mode <span className="font-normal text-muted">· Jev checks each slot every {CHECK_EVERY_MS / 1000}s</span>
+          Camera mode <span className="font-normal text-muted">· checks each slot every {CHECK_EVERY_MS / 1000}s</span>
         </h2>
         <label className="flex items-center gap-2 text-sm">
           <span className="text-muted">Camera</span>
@@ -365,7 +365,7 @@ export default function CameraPanel({
                 Clear boxes
               </button>
             </div>
-            {markedCount === 0 && <p className="mt-2 text-wait">No slots marked yet, so Jev is not being called.</p>}
+            {markedCount === 0 && <p className="mt-2 text-wait">No slots marked yet, so no slots are being checked.</p>}
           </div>
 
           {lastError && <p className="text-urgent">Last call failed: {lastError} Slots show Camera unsure.</p>}

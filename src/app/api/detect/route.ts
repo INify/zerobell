@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   if (!isLocalHost(host)) return fail(403, "Camera mode only runs on the laptop.");
 
   const key = process.env.TYPESAFE_API_KEY;
-  if (!key) return fail(500, "TYPESAFE_API_KEY is not set in .env.local.");
+  if (!key) return fail(500, "The detection key is missing on this laptop.");
 
   let body: JevCheckRequest;
   try {
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     });
   } catch (e) {
     const timedOut = e instanceof Error && e.name === "TimeoutError";
-    return fail(502, timedOut ? "Jev took too long to answer." : "Could not reach Jev.");
+    return fail(502, timedOut ? "Detection took too long." : "Could not reach the detection service.");
   }
 
   if (!res.ok) {
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
       model: payload.model,
       questions: payload.questions,
     });
-    return fail(502, `Jev returned ${res.status}.`);
+    return fail(502, `Detection service error (${res.status}).`);
   }
 
   const data = (await res.json().catch(() => null)) as {

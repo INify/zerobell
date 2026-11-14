@@ -3,7 +3,7 @@
 // it is easy to read and change.
 //
 // No secrets live here. The TypeSafe key is only read in
-// src/app/api/jev/route.ts, on the server.
+// src/app/api/detect/route.ts, on the server.
 
 export const JEV_MODEL = "jev-1.14.0";
 
@@ -73,7 +73,7 @@ export function stepTrack(
   return { track, change: { seen: r, at: track.firstAt } };
 }
 
-// What the browser sends to /api/jev and gets back.
+// What the browser sends to /api/detect and gets back.
 export type JevCheckRequest = { crops: { slotId: number; jpegBase64: string }[] };
 export type JevCheckResponse =
   | { ok: true; answers: Record<number, number | null>; inputTokens: number; questions: number }

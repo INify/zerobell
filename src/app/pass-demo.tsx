@@ -83,7 +83,7 @@ const SLOT_COUNT = 4;
 const SLOT_IDS = Array.from({ length: SLOT_COUNT }, (_, i) => i + 1);
 
 // Camera mode needs a webcam, which browsers only allow on a secure page, and
-// our /api/jev route, which only runs on the laptop. So: localhost only.
+// our /api/detect route, which only runs on the laptop. So: localhost only.
 const noSubscribe = () => () => {};
 function cameraSupported() {
   return (
@@ -504,7 +504,7 @@ export default function PassDemo() {
             <p className="mt-0.5 text-sm">
               <span className="font-semibold">A camera at the pass spots each plate.</span>{" "}
               <span className="text-muted">
-                {cameraOn ? "Jev is watching the pass camera." : "Tap Place plate to simulate."}
+                {cameraOn ? "Live now." : "Tap Place plate to simulate."}
               </span>
             </p>
           </div>
